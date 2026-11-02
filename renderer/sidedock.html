@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: hsmedia:" />
+  <title>HYPERSPACE DOCK</title>
+  <link rel="stylesheet" href="../node_modules/@fontsource/share-tech-mono/index.css" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/orbitron/500.css" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/orbitron/800.css" />
+  <link rel="stylesheet" href="sidedock.css" />
+  <link rel="stylesheet" href="purple.css" />
+</head>
+<body>
+  <div id="sd" class="sd">
+    <div class="sd-handle"></div>
+    <div class="sd-tab">◬</div>
+    <div class="sd-panel">
+      <div class="sd-top" title="Drag me: drop on a screen edge, on any window's corner, or anywhere to float"><span class="sd-grip">⠿</span><span class="sd-logo">◬</span> <span class="sd-name">HYPERSPACE</span><button class="sd-layer" title="Swap layers: over everything ⇄ other windows can cover it">⇅</button><button class="sd-open" title="Open HYPERSPACE">↗</button></div>
+      <div class="sd-drop hidden"></div>
+      <div id="sd-mods"></div>
+      <div class="sd-foot"><span class="sd-where"></span><button class="sd-layer" title="Swap layers">⇅</button></div>
+    </div>
+  </div>
+  <script src="accent.js"></script>
+  <script src="sidedock.js"></script>
+</body>
+</html>

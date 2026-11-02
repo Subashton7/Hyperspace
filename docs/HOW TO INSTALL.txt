@@ -1,0 +1,143 @@
+HYPERSPACE // SYSTEM SHAMAN  -  how to install (a field guide for mortals)
+==========================================================================
+
+Congratulations. Someone who loves you has handed you a program that makes
+your laptop look like it's hacking the Matrix while it's actually checking
+how hot it is. Let's begin the ritual.
+
+
+STEP 1: Summon it
+-----------------
+Double-click HYPERSPACE-Setup-0.11.0.exe. (That one figures out what kind of PC
+you have all by itself. If you were handed a smaller -x64 or -arm64 file
+instead, use that: -x64 is nearly every PC, -arm64 is the Snapdragon crowd.)
+
+It installs for your Windows account only, no admin password needed, and
+quietly drops itself into the Start Menu and onto your desktop like a
+houseguest who already knows where the snacks are.
+
+
+STEP 2: Windows will panic. This is normal.
+-------------------------------------------
+You'll see "Windows protected your PC." Windows says this about every app
+that didn't pay Microsoft for a fancy certificate. HYPERSPACE was made by a
+DJ, not a corporation. Windows is being dramatic.
+
+  Click "More info", then "Run anyway".
+
+Windows will grumble. Ignore it. Windows grumbles about everything.
+
+
+STEP 3: Power, only if you want it
+----------------------------------
+HYPERSPACE no longer begs for admin rights the moment it opens. It runs
+politely as you. The day you click something that needs the keys to the
+engine room (fan curves, power limits, the camera hard switch), it asks:
+"Ask Windows now?" Say yes, Windows shows its "Do you want to allow…"
+box, click Yes, done.
+
+Hate being asked every launch? FANS page → SKIP ADMIN PROMPT. Only do
+that on your own PC.
+
+Click No and it still runs, just without the hardware wizardry. Like a
+sports car with the engine politely asleep.
+
+Bonus: Settings → LOOK → PURPLE ACCENTS, for when green alone isn't
+dramatic enough.
+
+
+WHAT WORKS ON WHICH LAPTOP (managing expectations)
+--------------------------------------------------
+Works on any Windows 10/11 PC, no questions asked:
+  mic/camera kill switches, task manager, VJ visualizer, media deck,
+  display switcher, shortcuts, widgets, asset router, CRATE, the phone link.
+
+Acer Nitro / Predator only:
+  fan curves, Acer thermal profiles, CPU temperature, the NitroSense key.
+  The fan speeds were tuned on an Acer Nitro 5 (AN515-58). On a different
+  Acer they'll still work, but treat the numbers like a horoscope: broadly
+  right, emotionally accurate, not legally binding.
+
+NVIDIA graphics only:
+  GPU clocks, GPU temperature, VRAM tracking.
+
+If your laptop can't do something, HYPERSPACE shows "N/A" instead of
+pretending. It has integrity.
+
+
+TIPS FROM THE SHAMAN
+--------------------
+- LOST? Press Ctrl+F (or the FIND button up top) and type what you want: "fans",
+  "phone", "journal", "blackjack". It takes you straight there. No map required.
+
+- COOLING (FANS page): five big buttons. AUTO, QUIET, BALANCED, COOL, MAX. Pick one.
+  That's the whole job. FINE-TUNE is there if you enjoy drawing fan curves for fun.
+
+- NOTES: an encrypted notebook + journal, laid out like OneNote (minus Microsoft).
+  Everyday notes just open. The JOURNAL hides behind one master password, plus a
+  recovery key to WRITE ON PAPER. Lose both and not even the shaman can read your
+  diary. (Which is kind of the point.) Can import your OneNote notebooks in one click.
+
+- TO-DO: a to-do list, plus "De-Big-Tech My Life": a quest line with XP, ranks and
+  badges for escaping the big tech companies. Yes, quitting Google gives you XP now.
+
+- GAMES: Blackjack, Poker (Hold'em, Five-Card Draw, video poker) and Spades with a bot
+  partner. Play chips only. The bots don't gloat. Much.
+
+- The startup animation is magnificent. If you hate joy, click or press any
+  key to skip it, or go Burner -> HyperCore -> STARTUP ANIMATION and make it
+  silent or turn it off.
+
+- LITE MODE (the LITE button up top): when you're gaming, rendering, or
+  running something heavy, HYPERSPACE turns off its own glitter (background,
+  spinning things, glow) so your laptop can concentrate. On AUTO it does this
+  by itself when the laptop gets busy or hot, and turns the sparkle back on
+  once things calm down. Tweak the triggers in SETTINGS -> GENERAL.
+
+- PHONE CONTROL: click LINK in the title bar and scan the QR code with your
+  phone. A setup guide walks you through it one step at a time, like a very
+  patient flight attendant. Everything between your phone and laptop is
+  encrypted, and it only works on Wi-Fi networks you've told it to trust,
+  so the coffee shop can't join the party.
+  If Windows asks about the firewall, pick "Private networks" only.
+
+- SAVE TO FILES (phone, MUSIC tab): send a whole playlist to your phone's
+  Files app as a .zip, or hold one track to grab just that song.
+
+- The asset router is OFF until you switch it on (ROUTER tab). It will not
+  start rearranging your files behind your back. We're not like that.
+
+- SPOUT OUT (VJ tab): flip it on and the visualizer appears as a source
+  called "HYPERSPACE" in Resolume (Sources -> Spout), OBS (Spout2 Capture),
+  TouchDesigner (Syphon Spout In) and friends. Pick the same graphics card the
+  other app uses (usually NVIDIA), or they'll stare at each other in silence.
+
+- LIVE WALLPAPER (VJ tab): the visualizer plays behind your desktop icons and
+  dances to whatever's playing. It politely pauses when a game or video goes
+  fullscreen, because it has manners.
+
+- CRATE (music page): if you have rekordbox 6 or 7 it reads your whole library
+  (BPM, key, cues, playlists). No rekordbox? Click + ADD and point it at a
+  music folder like a normal person.
+
+- CRATE -> DJ DECKS: two decks with EQ kills, filter, crossfader, sync and
+  LINE UP DROPS. SETTINGS -> CRATE -> FETCH FOR MY LIBRARY pulls artwork,
+  release dates and tags from SoundCloud.
+
+- TABS: Ctrl+click a page in the sidebar to open it in a new tab. Drag a tab
+  out of the window (or click its window icon) and it becomes its own window,
+  free at last.
+
+- SETTINGS -> DISPLAY: every background effect lives here (rain, code
+  waterfall, tunnel, spirals...). Go wild. Or go LITE. Your call.
+
+- Acer Nitro only: BURNER -> HyperCore -> NITROSENSE KEY makes the NitroSense
+  button open HYPERSPACE instead. NitroSense will be sad. That's okay.
+
+
+BREAKING UP WITH HYPERSPACE
+---------------------------
+Windows Settings -> Apps -> Installed apps -> HYPERSPACE -> Uninstall.
+
+It won't text you. It won't make it weird. It'll just quietly go back into
+the void it came from.

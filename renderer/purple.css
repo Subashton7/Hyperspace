@@ -1,0 +1,80 @@
+/* PURPLE ACCENTS (Settings → LOOK): purple layered onto the green-and-black look, never replacing it.
+   Text and data stay green; borders, highlights, glows and the active things pick up purple. */
+body.purple {
+  --acc-rgb: 177, 76, 255;
+  --acc: #b14cff;
+  --acc-hot: #dcb0ff;
+  --acc-ghost: rgba(var(--acc-rgb), 0.1);
+  --acc-glow: 0 0 6px rgba(var(--acc-rgb), 0.8), 0 0 18px rgba(var(--acc-rgb), 0.35);
+  --panel-edge: rgba(var(--acc-rgb), 0.34);
+}
+/* the purple glow in the corners: main window only (the side dock is see-through, the phone has its own) */
+body.purple:has(> main) {
+  background:
+    repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.22) 2px 3px),
+    radial-gradient(ellipse at 85% 0%, rgba(var(--acc-rgb), 0.12), transparent 55%),
+    radial-gradient(ellipse at 10% 100%, rgba(var(--acc-rgb), 0.09), transparent 50%),
+    radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.75) 100%),
+    var(--void);
+}
+
+/* panels: purple corner brackets and header line, green text */
+body.purple .panel::before {
+  background:
+    linear-gradient(var(--acc), var(--acc)) top left / 22px 1px no-repeat,
+    linear-gradient(var(--acc), var(--acc)) top left / 1px 22px no-repeat,
+    linear-gradient(var(--g), var(--g)) bottom right / 22px 1px no-repeat,
+    linear-gradient(var(--g), var(--g)) bottom right / 1px 22px no-repeat;
+}
+body.purple .panel { box-shadow: inset 0 0 30px rgba(var(--acc-rgb), .05), 0 0 14px rgba(0, 0, 0, .6); }
+body.purple .panel-head { border-bottom-color: rgba(var(--acc-rgb), .22); }
+body.purple .panel-head .glyph { color: var(--acc); text-shadow: var(--acc-glow); }
+
+/* top bar + navigation */
+body.purple .brand-sigil { color: var(--acc); filter: drop-shadow(0 0 5px var(--acc)); }
+body.purple .brand .glitch { text-shadow: 0 0 6px rgba(0, 255, 110, .75), 2px 0 14px rgba(var(--acc-rgb), .55); }
+body.purple .chip:hover { border-color: var(--acc); box-shadow: var(--acc-glow); }
+body.purple .nav:hover { background: var(--acc-ghost); }
+body.purple .nav.active { background: linear-gradient(90deg, rgba(var(--acc-rgb), .16), rgba(0, 255, 110, .08)); }
+body.purple .nav.active::before { background: var(--acc); box-shadow: var(--acc-glow); }
+body.purple .nav.active svg { filter: drop-shadow(0 0 6px var(--acc)); }
+body.purple .tab.on::after { background: linear-gradient(90deg, var(--acc), var(--g)); box-shadow: var(--acc-glow); }
+body.purple .tab.drop { box-shadow: inset 3px 0 0 var(--acc); }
+
+/* controls */
+body.purple .act { border-color: var(--acc); }
+body.purple .act:hover { background: var(--acc-ghost); box-shadow: var(--acc-glow); }
+body.purple .act.danger { border-color: var(--red); }
+body.purple .seg button.on { box-shadow: 0 0 12px rgba(var(--acc-rgb), .7); outline: 1px solid var(--acc); outline-offset: -1px; }
+body.purple .seg button:hover { background: var(--acc-ghost); }
+body.purple .switch input:checked + span { box-shadow: 0 0 10px rgba(var(--acc-rgb), .7); }
+body.purple input:focus, body.purple select:focus, body.purple textarea:focus { border-color: var(--acc) !important; box-shadow: 0 0 10px rgba(var(--acc-rgb), .35) !important; }
+body.purple :focus-visible { outline-color: var(--acc); }
+body.purple #toast { border-color: var(--acc); box-shadow: var(--acc-glow); }
+body.purple #toast.bad { border-color: var(--red); }
+body.purple ::selection { background: rgba(var(--acc-rgb), .45); color: #fff; }
+body.purple ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--acc) 38%, #000); }
+
+/* pages */
+body.purple .nt-kicker, body.purple .td-rank, body.purple .nt-sectitle { color: var(--acc-hot) !important; text-shadow: 0 0 8px rgba(var(--acc-rgb), .6); }
+body.purple .nt-b.on, body.purple .nt-p.on { box-shadow: inset 3px 0 0 var(--acc); }
+body.purple .nt-go { border-color: var(--acc); }
+body.purple .nt-go:hover { box-shadow: var(--acc-glow); }
+body.purple .nt-card { border-color: rgba(var(--acc-rgb), .4); box-shadow: 0 0 40px rgba(var(--acc-rgb), 0.14); }
+
+/* side dock + phone use the same switch */
+body.purple .dk-card, body.purple .card { border-color: rgba(var(--acc-rgb), .34); }
+
+/* a bit more presence: header underlines fade from purple, top-bar buttons get purple edges */
+body.purple .panel-head { border-bottom: 1px solid transparent; border-image: linear-gradient(90deg, rgba(var(--acc-rgb), .65), rgba(var(--acc-rgb), .12) 55%, rgba(0, 255, 110, .1)) 1; }
+body.purple .chip { border-color: rgba(var(--acc-rgb), .5); }
+body.purple .nav.active span { color: var(--acc-hot); }
+body.purple .core-chip { border-color: rgba(var(--acc-rgb), .5); }
+
+/* accent swatches (SETTINGS → LOOK and the top of NOTES) */
+.acc-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.acc-dot { position: relative; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; background: var(--c); cursor: pointer; box-shadow: 0 0 8px color-mix(in srgb, var(--c) 55%, transparent); }
+.acc-dot:hover { transform: scale(1.15); }
+.acc-dot.on { border-color: #eafff0; box-shadow: 0 0 0 2px #000, 0 0 12px var(--c); }
+.acc-dot.custom { display: inline-block; background: conic-gradient(#ff4d6a, #ffb800, #00ff6e, #19e3ff, #b14cff, #ff4d6a); }
+.acc-dot.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }

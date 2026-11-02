@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'" />
+  <title>HYPERSPACE</title>
+  <link rel="stylesheet" href="../node_modules/@fontsource/share-tech-mono/index.css" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/orbitron/800.css" />
+  <style>
+    html, body { margin: 0; background: transparent; overflow: hidden; font-family: 'Share Tech Mono', monospace; user-select: none; }
+    #stack { position: fixed; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column-reverse; gap: 8px; padding: 6px; }
+    .card {
+      position: relative; display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: center; padding: 10px 14px 10px 10px;
+      background: rgba(0, 14, 6, 0.94); border: 1px solid #00ff6e; color: #b8ffd0; cursor: pointer; overflow: hidden;
+      box-shadow: 0 0 22px rgba(0, 255, 110, 0.45), inset 0 0 24px rgba(0, 255, 110, 0.12);
+      clip-path: polygon(0 10px, 10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+      animation: in .5s cubic-bezier(.2, .9, .2, 1.2) both, out .5s ease 4.6s forwards;
+    }
+    .card::after { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; background: #00ff6e; box-shadow: 0 0 8px #00ff6e; animation: life 5s linear forwards; }
+    .glyph { width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #eafff0;
+      text-shadow: 0 0 12px #00ff6e, 0 0 24px #00ff6e; border: 1px solid rgba(0, 255, 110, .4); border-radius: 50%; animation: spin 5s linear; }
+    .k { font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 11px; letter-spacing: 3px; color: #00ff6e; text-shadow: 0 0 8px #00ff6e; }
+    .n { color: #eafff0; font-size: 14px; margin: 3px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .d { color: #3ddc84; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @keyframes in { from { transform: translateX(110%) skewX(-12deg); opacity: 0; filter: blur(4px) hue-rotate(60deg); } to { transform: none; opacity: 1; filter: none; } }
+    @keyframes out { to { transform: translateX(30px); opacity: 0; filter: blur(3px); } }
+    @keyframes life { from { width: 100%; } to { width: 0; } }
+    @keyframes spin { from { transform: rotate(-180deg) scale(.4); } 12% { transform: rotate(0) scale(1.15); } 20%, to { transform: none; } }
+  </style>
+</head>
+<body>
+  <div id="stack"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# Downloaded packages (recreate with `npm install`)
+node_modules/
+
+# Build output (recreate with `npm run core` / `npm run installer`)
+installer/
+release/
+core/bin/
+core/obj/
+core/dist/
+
+# Certificates and keys generated at runtime
+*.pfx
+*.cer
+*.pem
+
+# Windows / editor clutter
+Thumbs.db
+desktop.ini
+.vscode/

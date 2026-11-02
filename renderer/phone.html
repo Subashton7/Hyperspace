@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000400" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="HYPERSPACE" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https:" />
+  <title>HYPERSPACE</title>
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="manifest" id="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/share-tech-mono/index.css" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/orbitron/500.css" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/orbitron/800.css" />
+  <link rel="stylesheet" href="phone.css" />
+  <link rel="stylesheet" href="purple.css" />
+</head>
+<body>
+  <canvas id="rain"></canvas>
+  <header class="top">
+    <span class="logo">◬</span><b>HYPERSPACE</b>
+    <div class="mode" id="mode"><button data-m="laptop">⌨ LAPTOP</button><button data-m="phone">▣ PHONE</button></div>
+    <span class="pill vpn" id="top-vpn">VPN …</span>
+    <i class="link" id="top-link" title="link to the laptop"></i>
+  </header>
+
+  <main>
+    <!-- MOBILE MODE setup (shown until this phone has the secure, offline-capable app) -->
+    <div class="card setup hidden" id="setup"></div>
+
+    <!-- PHONE: this phone -->
+    <section class="page" data-page="phone">
+      <div class="grid" id="vitals"></div>
+    </section>
+
+    <!-- HOME: the laptop at a glance -->
+    <section class="page" data-page="home">
+      <div class="card away hidden" id="away"><div class="h">⌨ LAPTOP NOT FOUND</div><div class="sub">Open HYPERSPACE on the laptop and join the same Wi-Fi: its stats and controls come back here on their own. Your offline music and the VJ keep working.</div></div>
+      <div class="grid" id="home"></div>
+    </section>
+
+    <!-- MUSIC: your CRATE library, here or on the laptop -->
+    <section class="page" data-page="music">
+      <div class="m-bar">
+        <div class="seg" id="out"><button data-v="phone">▶ ON PHONE</button><button data-v="laptop">⌨ ON LAPTOP</button></div>
+      </div>
+      <div class="m-bar">
+        <input id="q" type="search" placeholder="search  ·  bpm:140  key:8A" autocomplete="off" />
+        <select id="pl"><option value="">ALL TRACKS</option></select>
+      </div>
+      <div class="hint" id="count">loading your library…</div>
+      <div class="savef"><button id="save-files">⇩ SAVE TO FILES</button><span>or hold a track to save just that one</span></div>
+      <div id="list"></div>
+    </section>
+
+    <!-- VJ: the visuals on this phone -->
+    <section class="page" data-page="vj">
+      <div class="vj">
+        <canvas id="vj"></canvas>
+        <div class="vj-name" id="vj-name"></div>
+      </div>
+      <div class="btns"><button id="vj-prev">◀</button><button id="vj-pal">COLOUR</button><button id="vj-mic">MIC</button><button id="vj-next">▶</button></div>
+      <div class="hint">Tap the visuals for the next one, hold for the next colour. Without the mic it pulses to the BPM of what's playing on this phone.</div>
+    </section>
+
+    <!-- CONTROL: the laptop's switches -->
+    <section class="page" data-page="control">
+      <div class="card">
+        <div class="h">♫ VOLUME <em id="vol-v"></em></div>
+        <input type="range" id="vol" min="0" max="100" />
+        <div class="btns"><button id="vol-mute">MUTE</button></div>
+      </div>
+      <div class="card">
+        <div class="h">▶ WINDOWS MEDIA <em>Spotify, YouTube, any player</em></div>
+        <div class="trk" id="wm"></div>
+        <div class="btns big"><button data-wm="prev">⏮</button><button data-wm="toggle">⏯</button><button data-wm="next">⏭</button></div>
+      </div>
+      <div class="card">
+        <div class="h">⟁ SHIELD</div>
+        <div class="btns big"><button data-hw="mic">MIC</button><button data-hw="cam">CAM</button></div>
+      </div>
+      <div class="card">
+        <div class="h">✦ MODE</div>
+        <div class="btns"><button data-preset="gamer">GAMER</button><button data-preset="silent">SILENT</button><button data-preset="eco">ECO</button></div>
+      </div>
+      <div class="card">
+        <div class="h">❋ FANS <em id="fan-rpm"></em></div>
+        <div class="btns"><button data-fan="auto">AUTO</button><button data-fan="curve">MY CURVE</button><button data-fan="max">MAX</button></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- the player: what's playing, on the phone or the laptop -->
+  <div class="player hidden" id="player">
+    <div class="p-prog" id="p-prog"><i></i></div>
+    <div class="p-row">
+      <i class="p-art" id="p-art"></i>
+      <div class="p-names"><b id="p-title"></b><span id="p-sub"></span></div>
+      <button id="p-prev">⏮</button><button id="p-play" class="play">▶</button><button id="p-next">⏭</button>
+    </div>
+  </div>
+
+  <!-- SAVE TO FILES: the download link(s), tapped by hand so the browser lets them through -->
+  <div class="sheet hidden" id="save-sheet"><div class="h">⇩ SAVE TO FILES <button class="x" id="save-x">✕</button></div><div id="save-body"></div></div>
+
+  <!-- MOBILE MODE setup guide, one step per screen -->
+  <div class="wiz hidden" id="wiz"></div>
+
+  <nav class="tabs" id="tabs"></nav>
+  <div id="toast"></div>
+  <audio id="audio" preload="auto" playsinline></audio>
+
+  <script src="remote.js"></script>
+  <script src="vj-themes.js"></script>
+  <script src="phone-vj.js"></script>
+  <script src="accent.js"></script>
+  <script src="phone.js"></script>
+</body>
+</html>

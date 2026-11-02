@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- HYPERSPACE hardware core: telemetry, fan/power control, audio FFT, media, displays, memory.
+       Talks to the Electron app over a localhost socket (newline-delimited JSON). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>HyperCore</AssemblyName>
+    <RootNamespace>HyperCore</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <NoWarn>CA1416;CS8632</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <PackageReference Include="System.Management" Version="10.0.2" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.2" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
+    <PackageReference Include="Vortice.DXGI" Version="3.6.2" />
+    <!-- rekordbox's master.db is SQLCipher-encrypted -->
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.11" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.10" />
+    <!-- cover art + clean tags written into music files for rekordbox's Reload Tag -->
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+  </ItemGroup>
+
+  <!-- ReadyToRun (scripts/build-core.js) compiles ahead of time for a faster start. The Windows SDK projection (and
+       its WinRT runtime) is huge, barely used, and crashes the ahead-of-time compiler: those stay JIT-compiled. -->
+  <ItemGroup>
+    <PublishReadyToRunExclude Include="Microsoft.Windows.SDK.NET.dll" />
+    <PublishReadyToRunExclude Include="WinRT.Runtime.dll" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,16 @@
+{
+  "name": "HYPERSPACE",
+  "short_name": "HYPERSPACE",
+  "description": "SYSTEM SHAMAN on the phone: your music offline, the VJ, and the laptop when it's near.",
+  "start_url": "/renderer/phone.html?mode=phone",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000400",
+  "theme_color": "#000400",
+  "icons": [
+    { "src": "/renderer/icons/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/renderer/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/renderer/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

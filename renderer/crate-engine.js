@@ -1,0 +1,130 @@
+// CRATE audio engine: two decks through Web Audio. Each deck runs
+//   <audio> → 3-band isolator (lows / mids / highs, each with a kill) → filter sweep → channel fader → crossfader → master
+// The player uses the decks in turn for crossfaded transitions; the DJ page drives them by hand.
+// Tracks stream over hsmedia:// with CORS, which keeps the audio usable by the graph.
+window.CrateEngine = (() => {
+  const ctx = new AudioContext({ latencyHint: 'playback' });
+  const master = ctx.createGain();
+  master.connect(ctx.destination);
+  const LOW_X = 250, HIGH_X = 2500; // crossover points, like a DJ mixer's isolator
+  const bq = (type, f, q = Math.SQRT1_2) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q; return n; };
+  const chain = (...n) => { for (let i = 0; i < n.length - 1; i++) n[i].connect(n[i + 1]); };
+  const dbToGain = (d) => Math.pow(10, d / 20);
+
+  function makeDeck(name) {
+    const el = new Audio();
+    el.crossOrigin = 'anonymous';
+    el.preload = 'auto';
+    el.preservesPitch = true;
+    const src = ctx.createMediaElementSource(el);
+    const sum = ctx.createGain();
+    // two stacked Butterworths per edge (Linkwitz-Riley): the three bands add back up flat
+    const gLow = ctx.createGain(), gMid = ctx.createGain(), gHigh = ctx.createGain();
+    chain(src, bq('lowpass', LOW_X), bq('lowpass', LOW_X), gLow, sum);
+    chain(src, bq('highpass', LOW_X), bq('highpass', LOW_X), bq('lowpass', HIGH_X), bq('lowpass', HIGH_X), gMid, sum);
+    chain(src, bq('highpass', HIGH_X), bq('highpass', HIGH_X), gHigh, sum);
+    const filt = bq('allpass', 1000, 1);
+    const vol = ctx.createGain(), xf = ctx.createGain(), an = ctx.createAnalyser();
+    an.fftSize = 512;
+    chain(sum, filt, vol, xf, master);
+    vol.connect(an);
+    return {
+      name, el, gLow, gMid, gHigh, filt, vol, xf, an,
+      track: null, wave: null, hi: null, feat: null,
+      eq: { low: 0, mid: 0, high: 0 }, kill: { low: false, mid: false, high: false }, filter: 0, pitch: 0, cue: 0, fader: 1,
+    };
+  }
+  const A = makeDeck('A'), B = makeDeck('B');
+  const E = {
+    ctx, A, B, decks: [A, B], xf: 0,
+    other: (d) => (d === A ? B : A),
+    resume() { if (ctx.state !== 'running') ctx.resume().catch(() => {}); },
+
+    applyEq(d) {
+      const t = ctx.currentTime;
+      for (const [band, node] of [['low', d.gLow], ['mid', d.gMid], ['high', d.gHigh]]) node.gain.setTargetAtTime(d.kill[band] ? 0 : dbToGain(d.eq[band]), t, 0.012);
+    },
+    setEq(d, band, dbv) { d.eq[band] = Math.max(-26, Math.min(6, dbv)); E.applyEq(d); },
+    setKill(d, band, on) { d.kill[band] = on; E.applyEq(d); },
+    // -1 … 0 … +1: low-pass sweep down, off, high-pass sweep up
+    setFilter(d, v) {
+      d.filter = Math.max(-1, Math.min(1, v));
+      const f = d.filt, t = ctx.currentTime;
+      if (Math.abs(d.filter) < 0.02) { f.type = 'allpass'; return; }
+      if (d.filter < 0) { f.type = 'lowpass'; f.frequency.setTargetAtTime(20000 * Math.pow(0.0015, -d.filter), t, 0.02); }
+      else { f.type = 'highpass'; f.frequency.setTargetAtTime(20 * Math.pow(500, d.filter), t, 0.02); }
+      f.Q.value = 1.2;
+    },
+    setFader(d, v) { d.fader = Math.max(0, Math.min(1, v)); d.vol.gain.setTargetAtTime(d.fader * d.fader, ctx.currentTime, 0.01); },
+    // equal-power crossfader, 0 = all A, 1 = all B
+    setXf(x) {
+      E.xf = Math.max(0, Math.min(1, x));
+      const t = ctx.currentTime;
+      A.xf.gain.setTargetAtTime(Math.cos(E.xf * Math.PI / 2), t, 0.01);
+      B.xf.gain.setTargetAtTime(Math.sin(E.xf * Math.PI / 2), t, 0.01);
+    },
+    setPitch(d, pct) { d.pitch = Math.max(-16, Math.min(16, pct)); d.el.playbackRate = 1 + d.pitch / 100; },
+    setKeyLock(d, on) { d.el.preservesPitch = on; },
+    setMaster(v) { master.gain.setTargetAtTime(v, ctx.currentTime, 0.02); },
+    async setSink(id) { if (ctx.setSinkId) await ctx.setSinkId(id || ''); },
+    resetDeck(d) {
+      d.eq = { low: 0, mid: 0, high: 0 }; d.kill = { low: false, mid: false, high: false };
+      E.applyEq(d); E.setFilter(d, 0); E.setPitch(d, 0);
+    },
+    load(d, track, url) {
+      d.track = track; d.wave = null; d.hi = null; d.cue = 0;
+      d.el.src = url;
+      return new Promise((res) => {
+        const done = () => { d.el.removeEventListener('loadedmetadata', done); d.el.removeEventListener('error', done); res(); };
+        d.el.addEventListener('loadedmetadata', done); d.el.addEventListener('error', done);
+      });
+    },
+    bpmNow: (d) => (d.track?.bpm || 0) * d.el.playbackRate,
+    // where a deck is in its beat grid: { beat index, fraction into the beat, beat-in-bar, beat length s }
+    phase(d) {
+      const beats = d.wave?.beats;
+      if (!beats?.length) return null;
+      const ms = d.el.currentTime * 1000;
+      let lo = 0, hi = beats.length - 1;
+      while (lo < hi) { const m = (lo + hi + 1) >> 1; if (beats[m][0] <= ms) lo = m; else hi = m - 1; }
+      const cur = beats[lo], nx = beats[Math.min(beats.length - 1, lo + 1)];
+      const len = Math.max(1, (nx[0] - cur[0]) || 60000 / (cur[2] || 140)) / 1000;
+      return { i: lo, frac: Math.max(0, Math.min(1, (ms / 1000 - cur[0] / 1000) / len)), inBar: cur[1], len };
+    },
+    // match tempo to the other deck, then line the beats (and the bar) up
+    sync(d) {
+      const m = E.other(d);
+      if (!d.track?.bpm || !m.track?.bpm) return false;
+      let ratio = E.bpmNow(m) / d.track.bpm;
+      if (ratio > 1.5) ratio /= 2; else if (ratio < 0.67) ratio *= 2;
+      E.setPitch(d, (ratio - 1) * 100);
+      const pm = E.phase(m), pd = E.phase(d);
+      if (pm && pd) {
+        let beatShift = (pm.inBar - pd.inBar) + (pm.frac - pd.frac);
+        while (beatShift > 2) beatShift -= 4;
+        while (beatShift < -2) beatShift += 4;
+        d.el.currentTime = Math.max(0, d.el.currentTime + beatShift * pd.len);
+      }
+      return true;
+    },
+    level(d) { // 0..1 RMS for the meters
+      const buf = new Uint8Array(d.an.fftSize);
+      d.an.getByteTimeDomainData(buf);
+      let s = 0;
+      for (const v of buf) { const x = (v - 128) / 128; s += x * x; }
+      return Math.min(1, Math.sqrt(s / buf.length) * 2.2);
+    },
+  };
+  E.setXf(0);
+  // the audio thread sleeps while nothing plays (every HYPERSPACE window has an engine, most never use it)
+  ctx.suspend().catch(() => {});
+  let idleSince = 0;
+  setInterval(() => {
+    if (A.el.paused && B.el.paused) {
+      if (!idleSince) idleSince = Date.now();
+      else if (Date.now() - idleSince > 30000 && ctx.state === 'running') ctx.suspend().catch(() => {});
+    } else idleSince = 0;
+  }, 5000);
+  for (const d of [A, B]) d.el.addEventListener('play', E.resume);
+  return E;
+})();

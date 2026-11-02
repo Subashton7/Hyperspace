@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000400" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: hsmedia: https://*.sndcdn.com; media-src 'self' hsmedia:; connect-src 'self' hsmedia:" />
+  <title>HYPERSPACE</title>
+  <link rel="stylesheet" href="../node_modules/@fontsource/share-tech-mono/index.css" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/orbitron/500.css" />
+  <link rel="stylesheet" href="../node_modules/@fontsource/orbitron/800.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="modules.css" />
+  <link rel="stylesheet" href="crate.css" />
+<link rel="stylesheet" href="notes.css" />
+<link rel="stylesheet" href="todo.css" />
+<link rel="stylesheet" href="games.css" />
+  <link rel="stylesheet" href="hardware.css" />
+<link rel="stylesheet" href="purple.css" />
+</head>
+<body data-fx="high" class="booting">
+  <div id="intro">
+    <canvas></canvas>
+    <div class="intro-title">
+      <div class="it-main" data-text="HYPERSPACE">HYPERSPACE</div>
+      <div class="it-sub">// SYSTEM SHAMAN //</div>
+    </div>
+    <div class="intro-skip">CLICK OR PRESS ANY KEY TO SKIP</div>
+  </div>
+  <canvas id="bg"></canvas>
+  <div id="alarm" class="hidden">
+    <div class="alarm-banner">
+      <div class="glitch big" data-text="THERMAL EMERGENCY">THERMAL EMERGENCY</div>
+      <div id="alarm-reason">—</div>
+      <div id="alarm-actions" class="dim">—</div>
+      <button class="act danger" id="alarm-dismiss">DISMISS SIMULATION</button>
+    </div>
+  </div>
+
+  <header class="titlebar">
+    <div class="brand">
+      <svg class="brand-sigil" viewBox="-50 -50 100 100" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle r="16"/><circle cx="16" r="16"/><circle cx="-16" r="16"/>
+          <circle cx="8" cy="13.9" r="16"/><circle cx="-8" cy="13.9" r="16"/>
+          <circle cx="8" cy="-13.9" r="16"/><circle cx="-8" cy="-13.9" r="16"/>
+          <circle r="33"/>
+        </g>
+      </svg>
+      <span class="glitch" data-text="HYPERSPACE">HYPERSPACE</span>
+      <span class="ver">// SYSTEM SHAMAN</span>
+    </div>
+    <div class="titlebar-mid">
+      <span id="clock">--:--:--</span>
+      <span class="sep">◬</span>
+      <span id="host">—</span>
+    </div>
+    <div class="titlebar-ctrl">
+      <button id="widgets-btn" class="chip" title="Add, move and remove widget cards on any page">⊞ WIDGETS</button>
+      <button id="link-btn" class="chip" title="Control HYPERSPACE from your phone">⌬ LINK</button>
+      <button id="fx-btn" class="chip" title="Background effects: HIGH (everything) → LOW (rain only) → OFF">FX: HIGH</button>
+      <button id="lite-btn" class="chip" title="Lite mode">LITE: AUTO</button>
+      <button id="find-btn" class="chip" title="Find any page or feature (Ctrl+F)">⌕ FIND</button>
+      <button class="wbtn" data-win="min" title="Minimize">—</button>
+      <button class="wbtn" data-win="max" title="Maximize">▢</button>
+      <button class="wbtn close" data-win="close" title="Close">✕</button>
+    </div>
+  </header>
+
+  <div class="tabstrip" id="tabstrip"></div>
+
+  <nav class="side">
+    <button class="nav active" data-view="nexus" title="OPERATIONS: live stats, mic & camera shields, RAM cleanup">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><polygon points="0,-10 8.7,5 -8.7,5"/><polygon points="0,10 8.7,-5 -8.7,-5"/><circle r="2.2"/></g></svg>
+      <span>OPERATIONS</span>
+    </button>
+    <button class="nav" data-view="afterburner" title="FANS: cooling, temperatures, power modes">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><path d="M0,-10 C6,-4 7,2 0,10 C-7,2 -6,-4 0,-10Z"/><path d="M0,-3 C3,0 3,4 0,7 C-3,4 -3,0 0,-3Z"/><circle r="10.5" stroke-dasharray="2 3"/></g></svg>
+      <span>FANS</span>
+    </button>
+    <button class="nav" data-view="vj" title="VJ: visuals that dance to your music, on screen, as wallpaper or sent to other apps">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.1"><circle r="4"/><circle cx="4" r="4"/><circle cx="-4" r="4"/><circle cx="2" cy="3.46" r="4"/><circle cx="-2" cy="3.46" r="4"/><circle cx="2" cy="-3.46" r="4"/><circle cx="-2" cy="-3.46" r="4"/><circle r="10"/></g></svg>
+      <span>VJ</span>
+    </button>
+    <button class="nav" data-view="crate" title="CRATE: your music, with rekordbox BPM, keys and cues">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><circle r="10"/><circle r="6.2"/><circle r="2.2"/><path d="M0,-10 A10,10 0 0 1 10,0" stroke-width="2.2"/><path d="M-6.2,0 A6.2,6.2 0 0 1 0,-6.2" stroke-width="1.8"/></g></svg>
+      <span>CRATE</span>
+    </button>
+    <button class="nav" data-view="deck" title="DECK: volume, now playing, speakers and screens">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="-10" y="-7" width="20" height="14" rx="2"/><circle cx="-4" r="3.2"/><circle cx="4.5" r="3.2"/><path d="M-2,-10 L2,-10"/></g></svg>
+      <span>DECK</span>
+    </button>
+    <button class="nav" data-view="router" title="FILE ROUTER: auto-sorts new downloads into folders">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M-10,0 H-3 M-3,0 C2,0 2,-7 9,-7 M-3,0 C2,0 2,7 9,7 M-3,0 H9"/><path d="M6,-9.5 L9,-7 L6,-4.5 M6,4.5 L9,7 L6,9.5 M6,-2.5 L9,0 L6,2.5"/></g></svg>
+      <span>FILE ROUTER</span>
+    </button>
+    <button class="nav" data-view="senses" title="SENSES: mic &amp; camera privacy switches, and which apps used them">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><path d="M-10,0 Q0,-9 10,0 Q0,9 -10,0Z"/><circle r="3.5"/><circle r="1" fill="currentColor"/></g></svg>
+      <span>SENSES</span>
+    </button>
+    <button class="nav" data-view="notes" title="NOTES: your encrypted notebook and journal (replaces OneNote)">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><path d="M-7,-10 H5 L8,-7 V10 H-7 Z"/><path d="M-4,-5 H4 M-4,-1 H4 M-4,3 H1"/><circle cx="5" cy="6" r="2.4"/><path d="M5,3.6 V2.5"/></g></svg>
+      <span>NOTES</span>
+    </button>
+    <button class="nav" data-view="todo" title="TO-DO: your list, and the De-Big-Tech My Life quest line">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><path d="M-4,0 L-1,3 L5,-4" stroke-width="1.6"/></g></svg>
+      <span>TO-DO</span>
+    </button>
+    <button class="nav" data-view="games" title="GAMES: blackjack, spades, poker">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="-9" y="-7" width="11" height="15" rx="1.5" transform="rotate(-12)"/><rect x="-2" y="-8" width="11" height="15" rx="1.5" transform="rotate(10)"/><path d="M3.5,-2 l2,3 -2,3 -2,-3z"/></g></svg>
+      <span>GAMES</span>
+    </button>
+    <button class="nav sealed hidden" data-view="software" title="Software (coming)">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="-8" y="-8" width="16" height="16" transform="rotate(45)"/><rect x="-8" y="-8" width="16" height="16"/><circle r="3"/></g></svg>
+      <span>SOFTWARE</span>
+    </button>
+    <button class="nav" data-view="hardware" title="HARDWARE: every USB port, hub and device, with power and speed">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><circle r="9"/><circle r="5"/><path d="M0,-12V-5M0,5V12M-12,0H-5M5,0H12"/></g></svg>
+      <span>HARDWARE</span>
+    </button>
+    <button class="nav" data-view="settings" title="Settings: background artifacts, startup, keys, CRATE">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><circle r="3.4"/><path d="M0,-10.5V-7M0,7V10.5M-10.5,0H-7M7,0H10.5M-7.4,-7.4L-5,-5M5,5L7.4,7.4M-7.4,7.4L-5,5M5,-5L7.4,-7.4"/><circle r="7" stroke-dasharray="2.2 2"/></g></svg>
+      <span>SETTINGS</span>
+    </button>
+    <div class="side-foot"><div class="mini-sigil"></div></div>
+  </nav>
+
+  <main>
+    <!-- ============ NEXUS ============ -->
+    <section class="view active" id="view-nexus">
+      <div class="nexus-grid">
+        <div class="panel shield">
+          <div class="panel-head"><span class="glyph">⟁</span> SENSORY SHIELD <span class="hint" title="Ctrl+Alt+Shift+M toggles mic · Ctrl+Alt+Shift+C toggles camera">C+A+S · M / C</span></div>
+          <div class="toggles">
+            <button class="orb" id="orb-mic" data-kind="mic">
+              <canvas class="orb-canvas"></canvas>
+              <svg class="orb-icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></g><path class="slash" d="M4 4l16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <div class="orb-label">MIC</div>
+              <div class="orb-state">—</div>
+            </button>
+            <button class="orb" id="orb-cam" data-kind="cam">
+              <canvas class="orb-canvas"></canvas>
+              <svg class="orb-icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.5" y="6.5" width="13" height="11" rx="2"/><path d="M15.5 10.5l6-3.5v10l-6-3.5z"/></g><path class="slash" d="M4 4l16 16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <div class="orb-label">CAMERA</div>
+              <div class="orb-state">—</div>
+            </button>
+          </div>
+          <div class="shield-watch" id="shield-watch">scanning for listeners…</div>
+        </div>
+
+        <div class="panel mandala-panel">
+          <div class="panel-head"><span class="glyph">✺</span> CORE MANDALA <span class="hint" id="cpu-name">—</span></div>
+          <div class="mandala-wrap">
+            <canvas id="mandala"></canvas>
+            <div class="ring-legend" id="ring-legend">
+              <div class="rl" data-k="mem"><i></i><span>MEMORY</span><b>--</b></div>
+              <div class="rl" data-k="gpu"><i></i><span>GPU</span><b>--</b></div>
+              <div class="rl" data-k="disk"><i></i><span>DISK</span><b>--</b></div>
+              <div class="rl" data-k="cpu"><i></i><span>CPU</span><b>--</b></div>
+            </div>
+            <div class="mandala-readout">
+              <div class="big" id="core-pct">--</div>
+              <div class="small">MEMORY</div>
+              <div class="tiny" id="core-sub">&nbsp;</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel vitals">
+          <div class="panel-head"><span class="glyph">☍</span> VITAL STREAMS
+            <button class="chip mini right" id="radar-btn" title="Switch disk/network between line graphs and radar">MODE: GRAPH</button>
+          </div>
+          <div class="vital" data-k="cpu"><div class="v-top"><span>CPU</span><b id="v-cpu">--</b></div><canvas class="spark"></canvas><div class="v-sub" id="v-cpu-sub">&nbsp;</div></div>
+          <div class="vital" data-k="mem"><div class="v-top"><span>MEMORY <button class="vac-btn" id="vac-btn">⟲ VACUUM</button></span><b id="v-mem">--</b></div><canvas class="spark"></canvas><div class="v-sub" id="v-mem-sub">&nbsp;</div></div>
+          <div class="vital" data-k="gpu"><div class="v-top"><span>GPU 3D</span><b id="v-gpu">--</b></div><canvas class="spark"></canvas><div class="v-sub" id="v-gpu-sub">&nbsp;</div></div>
+          <div class="vital" data-k="disk"><div class="v-top"><span>DISK</span><b id="v-disk">--</b></div><canvas class="spark"></canvas><div class="v-sub" id="v-disk-sub">&nbsp;</div></div>
+          <div class="vital" data-k="net"><div class="v-top"><span>NETWORK</span><b id="v-net">--</b></div><canvas class="spark"></canvas><div class="v-sub" id="v-net-sub">&nbsp;</div></div>
+        </div>
+
+        <div class="panel procs">
+          <div class="panel-head">
+            <span class="glyph">⌬</span> ENTITIES <span class="hint">running apps</span> <span class="count" id="proc-count">—</span>
+            <div class="proc-tools">
+              <input id="proc-search" type="text" placeholder="search running apps…" aria-label="Search running apps" spellcheck="false" />
+              <button class="chip" id="group-btn" title="Merge processes with the same name">GROUP: ON</button>
+              <button class="chip" id="run-btn" title="Run a program or command (like Win+R)">▶ RUN</button>
+            </div>
+          </div>
+          <div class="proc-bar" id="proc-bar">
+            <span class="pb-sel" id="pb-sel">click a row to select · right-click for everything</span>
+            <button data-pa="end">END TASK</button><button data-pa="tree" title="End it and everything it started">END TREE</button>
+            <button data-pa="restart" title="End it, then start it again">RESTART</button><button data-pa="suspend" title="Freeze / unfreeze it">SUSPEND</button>
+            <button data-pa="eco" title="Efficiency mode: low priority + power saving, like Task Manager's leaf">ECO MODE</button>
+            <select data-pa="prio" title="Priority"><option value="">PRIORITY…</option><option value="high">HIGH</option><option value="above">ABOVE NORMAL</option><option value="normal">NORMAL</option><option value="below">BELOW NORMAL</option><option value="idle">LOW</option></select>
+            <button data-pa="info">DETAILS</button><button data-pa="loc">LOCATION</button><button data-pa="web" title="Look it up online">SEARCH</button>
+          </div>
+          <div class="run-box hidden" id="run-box"><input id="run-cmd" class="rt-input" placeholder="notepad · cmd · C:\path\to\app.exe · https://…" spellcheck="false" /><button class="act" id="run-go">RUN</button></div>
+          <div class="table">
+            <div class="thead">
+              <div class="c-name sortable" data-sort="name">ENTITY</div>
+              <div class="c-pid sortable" data-sort="pid">PID</div>
+              <div class="c-cpu sortable" data-sort="cpu">CPU</div>
+              <div class="c-mem sortable" data-sort="mem">MEMORY</div>
+              <div class="c-vram sortable" data-sort="vram">VRAM</div>
+              <div class="c-act"></div>
+            </div>
+            <div class="tbody" id="proc-body"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ AFTERBURNER ============ -->
+    <section class="view scroll" id="view-afterburner">
+      <div class="ab-grid">
+        <div class="panel ab-read">
+          <div class="panel-head"><span class="glyph">◈</span> READOUTS <span class="hint" id="ab-core-badge">core offline</span></div>
+          <div class="tiles">
+            <div class="tile-group" id="ab-cpu-name">CPU</div>
+            <div class="tile" data-t="cpuClock"><span>CLOCK</span><b>--</b><i>MHz</i></div>
+            <div class="tile" data-t="cpuTemp"><span>TEMP</span><b>--</b><i>°C</i></div>
+            <div class="tile" data-t="cpuPower"><span>POWER</span><b>--</b><i>W</i></div>
+            <div class="tile" data-t="cpuVolt"><span>VOLTAGE</span><b>--</b><i>V</i></div>
+            <div class="tile" data-t="cpuFan"><span>FAN</span><b>--</b><i>RPM</i></div>
+            <div class="tile" data-t="cpuUtil"><span>LOAD</span><b>--</b><i>%</i></div>
+            <div class="tile-group" id="ab-gpu-name">GPU</div>
+            <div class="tile" data-t="gpuClock"><span>CORE</span><b>--</b><i>MHz</i></div>
+            <div class="tile" data-t="gpuMem"><span>MEMORY</span><b>--</b><i>MHz</i></div>
+            <div class="tile" data-t="gpuTemp"><span>TEMP</span><b>--</b><i>°C</i></div>
+            <div class="tile" data-t="gpuPower"><span>POWER</span><b>--</b><i>W</i></div>
+            <div class="tile" data-t="gpuVolt"><span>VOLTAGE</span><b>--</b><i>V</i></div>
+            <div class="tile" data-t="gpuFan"><span>FAN</span><b>--</b><i>RPM</i></div>
+          </div>
+          <div class="ab-note" id="ab-throttle">&nbsp;</div>
+        </div>
+
+        <div class="panel ab-graph">
+          <div class="panel-head"><span class="glyph">⟿</span> TELEMETRY TRACE <div class="series" id="ab-series"></div></div>
+          <div class="canvas-box trace-box"><canvas id="ab-graph"></canvas></div>
+        </div>
+
+        <div class="panel ab-thermal">
+          <div class="panel-head"><span class="glyph">♨</span> THERMAL HISTORY <span class="hint" id="th-span">—</span>
+            <div class="series" id="th-series"></div>
+            <div class="seg small" id="th-range"><button data-v="5m">5 MIN</button><button data-v="30m">30 MIN</button><button data-v="2h">2 H</button><button data-v="6h">6 H</button><button data-v="12h">12 H</button></div>
+          </div>
+          <div class="canvas-box th-box"><canvas id="th-graph"></canvas></div>
+          <div class="th-stats" id="th-stats"></div>
+        </div>
+
+        <div class="panel ab-modes">
+          <div class="panel-head"><span class="glyph">✦</span> MODES</div>
+          <div class="presets">
+            <button class="preset" data-preset="gamer"><svg viewBox="-20 -20 40 40"><g fill="none" stroke="currentColor" stroke-width="1.4"><polygon points="0,-17 14.7,8.5 -14.7,8.5"/><polygon points="0,17 14.7,-8.5 -14.7,-8.5"/><circle r="5"/></g></svg><b>GAMER</b><span>/ OC</span></button>
+            <button class="preset" data-preset="silent"><svg viewBox="-20 -20 40 40"><g fill="none" stroke="currentColor" stroke-width="1.4"><circle r="16"/><circle r="10"/><circle r="4"/></g></svg><b>SILENT</b><span>/ RENDER</span></button>
+            <button class="preset" data-preset="eco"><svg viewBox="-20 -20 40 40"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M0,-16 C10,-8 10,8 0,16 C-10,8 -10,-8 0,-16Z"/><path d="M0,-16V16"/></g></svg><b>ECO</b><span>/ LOW POWER</span></button>
+          </div>
+          <div class="preset-desc" id="preset-desc">hover a mode to see exactly what it changes</div>
+        </div>
+
+        <div class="panel ab-tune">
+          <div class="panel-head"><span class="glyph">⚙</span> TUNING</div>
+          <div class="tune">
+            <label>WINDOWS POWER MODE</label>
+            <div class="seg" data-key="overlay"><button data-v="efficiency">EFFICIENCY</button><button data-v="balanced">BALANCED</button><button data-v="performance">PERFORMANCE</button></div>
+            <label class="acer-only">ACER THERMAL PROFILE</label>
+            <div class="seg acer-only" data-key="acerProfile"><button data-v="eco">ECO</button><button data-v="quiet">QUIET</button><button data-v="balanced">BAL</button><button data-v="performance">PERF</button><button data-v="turbo">TURBO</button></div>
+            <label>CPU MAX STATE <b id="tv-cpuMax">--</b> <em class="dim">below 50% everything gets slow</em></label>
+            <input type="range" class="slider" id="t-cpuMax" min="30" max="100" step="1" />
+            <label>CPU TURBO BOOST</label>
+            <div class="seg" data-key="boost"><button data-v="0">OFF</button><button data-v="1">ON</button><button data-v="2">AGGRESSIVE</button><button data-v="3">EFFICIENT</button></div>
+            <label>GPU CORE CLOCK CAP <b id="tv-gpuMax">--</b> <button class="chip mini" id="t-gpuReset">UNLOCK</button></label>
+            <input type="range" class="slider" id="t-gpuMax" min="300" max="2100" step="15" />
+            <label>GPU MEMORY CLOCK CAP <b id="tv-memMax">--</b> <button class="chip mini" id="t-memReset">UNLOCK</button></label>
+            <input type="range" class="slider" id="t-memMax" min="405" max="6001" step="50" />
+          </div>
+        </div>
+
+        <div class="panel ab-cool no-acer-only">
+          <div class="panel-head"><span class="glyph">❋</span> COOLING</div>
+          <p class="dim" style="padding:14px">Fan control works on Acer Nitro and Predator laptops. On this PC the fans stay with Windows and the maker's own app, and HYPERSPACE still shows temperatures and load.</p>
+        </div>
+        <div class="panel ab-cool acer-only">
+          <div class="panel-head"><span class="glyph">❋</span> COOLING <span class="hint">one click · HYPERSPACE handles the fans</span>
+            <button class="chip mini right" id="cool-adv" title="Show or hide the fan curve graph">CURVE GRAPH ▾</button></div>
+          <div class="cool-presets" id="cool-presets">
+            <button data-p="auto"><b>AUTO</b><span>the laptop decides, like NitroSense</span></button>
+            <button data-p="quiet"><b>QUIET</b><span>fans stay low until it's properly warm</span></button>
+            <button data-p="balanced"><b>BALANCED</b><span>everyday: cool without the roar</span></button>
+            <button data-p="aggressive"><b>COOL</b><span>gaming, rendering, AI: cooler, louder</span></button>
+            <button data-p="max"><b>MAX</b><span>full blast, right now</span></button>
+          </div>
+          <div class="cool-live">
+            <div><em>CPU</em><b id="cool-ct">--°</b><span id="cool-cf">-- rpm</span></div>
+            <div><em>GPU</em><b id="cool-gt">--°</b><span id="cool-gf">-- rpm</span></div>
+            <div class="cool-now"><em>RIGHT NOW</em><b id="cool-mode">—</b><span id="cool-why"></span></div>
+          </div>
+          <div class="cool-bars">
+            <div><em>CPU FAN</em><div class="cool-gauge"><i id="cool-cb"></i></div><b id="cool-cp">--%</b></div>
+            <div><em>GPU FAN</em><div class="cool-gauge"><i id="cool-gb"></i></div><b id="cool-gp">--%</b></div>
+          </div>
+          <div class="cool-manual">
+            <div class="cool-mhead"><b>SET EACH FAN YOURSELF</b><span>holds a fixed speed no matter the temperature · the safety floor still speeds them up above 88°C</span></div>
+            <label>CPU FAN <b id="cool-mcv">--%</b></label><input type="range" class="slider" id="cool-mc" min="0" max="100" step="5" />
+            <label>GPU FAN <b id="cool-mgv">--%</b></label><input type="range" class="slider" id="cool-mg" min="0" max="100" step="5" />
+          </div>
+        </div>
+
+        <div class="panel ab-fans acer-only">
+          <div class="panel-head"><span class="glyph">❋</span> FAN CURVES <span class="hint">advanced</span>
+            <div class="seg small right" id="fan-mode"><button data-v="auto">AUTO</button><button data-v="curve">CURVE</button><button data-v="max">MAX</button></div>
+          </div>
+          <div class="fan-bar">
+            <div class="seg small" id="fan-tab"><button data-v="cpu" class="on">CPU FAN</button><button data-v="gpu">GPU FAN</button></div>
+            <div class="seg small" id="fan-tpl"><button data-v="quiet">QUIET</button><button data-v="balanced">BALANCED</button><button data-v="aggressive">AGGRO</button></div>
+          </div>
+          <div class="canvas-box fan-box"><canvas id="fan-graph"></canvas></div>
+          <div class="ab-note" id="fan-note">drag the glowing nodes · curve applies when mode = CURVE</div>
+        </div>
+
+        <div class="panel ab-heat">
+          <div class="panel-head"><span class="glyph">☢</span> OVERHEAT PROTOCOL <label class="switch right"><input type="checkbox" id="oh-enabled" /><span></span></label></div>
+          <div class="tune">
+            <label>CPU ALARM <b id="ohv-cpu">--</b><em>Tjmax 100°C</em></label>
+            <input type="range" class="slider hot" id="oh-cpu" min="70" max="100" step="1" />
+            <label>GPU ALARM <b id="ohv-gpu">--</b><em>target 87 · slowdown 97</em></label>
+            <input type="range" class="slider hot" id="oh-gpu" min="70" max="97" step="1" />
+            <label class="check"><input type="checkbox" id="oh-fans" /> force fans to MAX</label>
+            <label class="check"><input type="checkbox" id="oh-throttle" /> throttle power (CPU 80%, no boost, GPU ≤ 1200 MHz)</label>
+            <button class="act" id="oh-sim">SIMULATE ALARM</button>
+          </div>
+        </div>
+
+        <div class="panel ab-vram">
+          <div class="panel-head"><span class="glyph">▣</span> VRAM HOGS <span class="hint" id="vram-total">—</span></div>
+          <div class="vram-meter"><i id="vram-fill"></i></div>
+          <div class="vram-list" id="vram-list"></div>
+        </div>
+
+        <div class="panel ab-core">
+          <div class="panel-head"><span class="glyph">⌘</span> HYPERCORE</div>
+          <div class="core-rows" id="core-rows"></div>
+          <div class="tune" style="padding-top:0;padding-bottom:4px">
+            <label>UI RENDERS ON <em>restarts HYPERSPACE</em></label>
+            <div class="seg small" id="render-gpu"><button data-v="integrated">INTEGRATED · BATTERY</button><button data-v="nvidia">GRAPHICS CARD · SMOOTH</button><button data-v="safe">NO GPU · SAFE</button></div>
+            <label>STARTUP ANIMATION</label>
+            <div class="seg small" id="intro-mode"><button data-v="full">FULL</button><button data-v="silent">SILENT</button><button data-v="off">OFF</button><button data-v="replay">▶ REPLAY</button></div>
+            <label class="acer-only">NITROSENSE KEY <em>the key above the numpad</em></label>
+            <div class="seg small acer-only" id="ns-key"><button data-v="off">OPENS NITROSENSE</button><button data-v="key">OPENS HYPERSPACE</button></div>
+            <div class="dim tiny acer-only" id="ns-status"></div>
+          </div>
+          <div class="core-actions">
+            <button class="act" id="core-admin">RESTART AS ADMIN</button>
+            <button class="act" id="core-task">SKIP ADMIN PROMPT</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VJ ============ -->
+    <section class="view" id="view-vj">
+      <div class="vj-wrap">
+        <div class="vj-stage" id="vj-stage">
+          <canvas id="vj-canvas"></canvas>
+          <div class="vj-hud">
+            <div class="vj-theme" id="vj-theme-name">FLOWER OF LIFE</div>
+            <div class="vj-bands"><i id="vb-bass"></i><i id="vb-mid"></i><i id="vb-treble"></i></div>
+            <div class="vj-beat" id="vj-beat"></div>
+            <div class="vj-src" id="vj-src">listening…</div>
+            <div class="vj-spout hidden" id="vj-spout">◉ SPOUT LIVE</div>
+          </div>
+          <button class="chip vj-fs" id="vj-fs" title="Fullscreen (F)">⛶ FULLSCREEN</button>
+        </div>
+        <div class="panel vj-ctrl">
+          <div class="panel-head"><span class="glyph">◉</span> VJ CONTROL</div>
+          <div class="vj-controls" id="vj-controls"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CRATE ============ -->
+    <section class="view" id="view-crate">
+      <div class="crate">
+        <aside class="panel cr-side">
+          <div class="panel-head"><span class="glyph">◎</span> CRATE <span class="hint" id="cr-src">loading…</span><button class="chip mini right" id="cr-get" title="Get a free track from a SoundCloud link">⇩ GET</button><button class="chip mini" id="cr-refresh" title="Re-read the rekordbox library">⟳</button><button class="chip mini" id="cr-settings" title="CRATE settings: SoundCloud lookups, transitions, keys">⚙</button></div>
+          <div class="cr-nav" id="cr-nav"></div>
+        </aside>
+        <div class="panel cr-main">
+          <div class="cr-head">
+            <div class="cr-cover" id="cr-cover"></div>
+            <div class="cr-info">
+              <div class="cr-kicker" id="cr-kicker">LIBRARY</div>
+              <h2 id="cr-title">ALL TRACKS</h2>
+              <div class="cr-meta" id="cr-meta">—</div>
+              <div class="cr-actions"><button class="cr-bigplay" id="cr-playall" title="Play this list">▶</button><button class="chip" id="cr-shuffleall">⤮ SHUFFLE</button></div>
+            </div>
+            <div class="cr-tools">
+              <div class="seg cr-modes" id="cr-modes"><button data-mode="player" class="on">▶ PLAYER</button><button data-mode="dj">◉◉ DJ DECKS</button></div>
+              <input id="cr-search" class="rt-input" placeholder="search… try  bpm:140  key:8A  genre:dubstep  ★3" spellcheck="false" />
+              <div class="cr-toolrow">
+                <div class="seg small" id="cr-keyfmt" title="How keys are shown"><button data-v="camelot">CAMELOT</button><button data-v="musical">MUSICAL</button></div>
+                <button class="chip mini" id="cr-clean" title="Show 50_Carrot_-_Wiz_Kid_KLICKAUD as 50 Carrot – Wiz Kid (display only, files untouched)">CLEAN TITLES</button>
+              </div>
+            </div>
+          </div>
+          <div class="cr-table">
+            <div class="cr-row cr-thead" id="cr-thead">
+              <div class="c-n">#</div><div class="c-t" data-sort="title">TITLE</div><div class="c-b" data-sort="bpm">BPM</div><div class="c-k" data-sort="key">KEY</div>
+              <div class="c-l" data-sort="len">TIME</div><div class="c-g" data-sort="genre">GENRE</div><div class="c-r" data-sort="rating">★</div><div class="c-p" data-sort="plays">PLAYS</div><div class="c-a" data-sort="released">RELEASED</div>
+            </div>
+            <div class="cr-body" id="cr-body"><div class="cr-rows" id="cr-rows"></div></div>
+          </div>
+        </div>
+        <aside class="panel cr-next">
+          <div class="cr-stabs" id="cr-stabs"><button data-side="info" class="on">INFO</button><button data-side="mix">MIX NEXT</button><button data-side="doubles">DOUBLES</button><button data-side="queue">UP NEXT</button></div>
+          <div class="cr-sidepage" data-sidep="info" id="cr-info"><div class="dim tiny cr-pad">click a track to see everything about it</div></div>
+          <div class="cr-sidepage hidden" data-sidep="mix"><div class="cr-sub">key + tempo matches for what's playing</div><div class="cr-mixlist" id="cr-mix"><div class="dim tiny cr-pad">play a track to see what mixes into it</div></div></div>
+          <div class="cr-sidepage hidden" data-sidep="doubles"><div class="cr-sub" id="cr-dbl-for">doubles for the selected track</div><div class="cr-mixlist" id="cr-dbl"></div></div>
+          <div class="cr-sidepage hidden" data-sidep="queue"><div class="cr-sub">up next <button class="chip mini right" id="cr-qclear">CLEAR</button></div><div class="cr-queue" id="cr-queue"></div></div>
+        </aside>
+        <div class="panel cr-dj hidden" id="cr-dj"></div>
+        <div class="panel cr-player">
+          <div class="cr-np">
+            <div class="cr-npart" id="cr-npart"></div>
+            <div class="cr-nptext"><b id="cr-nptitle">nothing playing</b><span id="cr-npartist">&nbsp;</span>
+              <div class="cr-badges" id="cr-badges"></div></div>
+            <button class="cr-love" id="cr-love" title="Like (saved in HYPERSPACE)">♡</button>
+          </div>
+          <div class="cr-center">
+            <div class="cr-transport">
+              <button id="cr-shuf" title="Shuffle">⤮</button><button id="cr-prev" title="Previous (P)">⏮</button>
+              <button id="cr-play" class="cr-pp" title="Play / pause (Space)">▶</button>
+              <button id="cr-next" title="Next (N)">⏭</button><button id="cr-rep" title="Repeat">↻</button>
+              <div class="cr-pos" id="cr-pos"></div>
+            </div>
+            <div class="cr-wavebox"><span id="cr-tcur">0:00</span><div class="cr-wave"><canvas id="cr-wave"></canvas></div><span id="cr-tlen">0:00</span></div>
+          </div>
+          <div class="cr-right">
+            <div class="cr-cues" id="cr-cues"></div>
+            <div class="cr-vol"><span>VOL</span><input type="range" class="slider" id="cr-vol" min="0" max="100" /><button class="chip mini" id="cr-xfade" title="How each track hands over to the next">XFADE 8s</button></div>
+            <div class="cr-xpop hidden" id="cr-xpop"></div>
+            <select id="cr-out" title="Play through (e.g. headphones to preview)"><option value="">default output</option></select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DECK ============ -->
+    <section class="view scroll" id="view-deck">
+      <div class="deck-grid">
+        <div class="panel deck-master">
+          <div class="panel-head"><span class="glyph">♫</span> MASTER <span class="hint" id="deck-dev">—</span></div>
+          <div class="master-row">
+            <button class="hexbtn big" id="deck-mute"><svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="waves" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/><path class="slash" d="M16 9l6 6M22 9l-6 6"/></g></svg><b>MUTE</b></button>
+            <div class="vol">
+              <label>VOLUME <b id="deck-vol-v">--</b></label>
+              <input type="range" class="slider big" id="deck-vol" min="0" max="100" step="1" />
+              <canvas id="deck-meter"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="panel deck-media">
+          <div class="panel-head"><span class="glyph">▶</span> TRANSPORT</div>
+          <div class="now"><div id="np-title">nothing playing</div><div id="np-artist" class="dim">&nbsp;</div><div id="np-app" class="dim tiny">&nbsp;</div></div>
+          <div class="transport">
+            <button class="hexbtn" data-media="prev" aria-label="Previous track" title="Previous track"><svg viewBox="0 0 24 24"><path d="M6 5v14M19 5L9 12l10 7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+            <button class="hexbtn big" data-media="toggle" id="np-toggle" aria-label="Play / pause" title="Play / pause"><svg viewBox="0 0 24 24"><path class="play" d="M8 5l11 7-11 7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path class="pause" d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+            <button class="hexbtn" data-media="next" aria-label="Next track" title="Next track"><svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+        <div class="panel deck-out">
+          <div class="panel-head"><span class="glyph">⇄</span> AUDIO OUTPUT</div>
+          <div class="dev-list" id="deck-outputs"></div>
+        </div>
+        <div class="panel deck-disp">
+          <div class="panel-head"><span class="glyph">▭</span> DISPLAYS</div>
+          <div class="topo seg" id="deck-topo"><button data-v="internal">LAPTOP ONLY</button><button data-v="clone">DUPLICATE</button><button data-v="extend">EXTEND</button><button data-v="external">SECOND ONLY</button></div>
+          <div id="deck-displays"></div>
+          <div class="keep-bar hidden" id="keep-bar"><span>Keep this display setting? Reverting in <b id="keep-s">15</b>s</span><button class="act" id="keep-yes">KEEP</button><button class="act danger" id="keep-no">REVERT</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ROUTER ============ -->
+    <section class="view scroll" id="view-router">
+      <div class="router-grid">
+        <div class="panel rt-main">
+          <div class="panel-head"><span class="glyph">⇶</span> ASSET ROUTER <label class="switch right" title="Start / stop watching"><input type="checkbox" id="rt-enabled" /><span></span></label></div>
+          <div class="tune">
+            <div class="rt-state" id="rt-state">loading…</div>
+            <label>WATCHING</label>
+            <div id="rt-watch" class="rt-watch"></div>
+            <button class="act" id="rt-addwatch">+ WATCH A FOLDER</button>
+            <label class="check"><input type="checkbox" id="rt-clean" /> clean names (Kick 01 (1).wav → Kick_01.wav)</label>
+            <label class="check"><input type="checkbox" id="rt-popup" /> pop up on screen when a file is routed</label>
+            <label>TRY A FILENAME</label>
+            <input id="rt-test" class="rt-input" placeholder="e.g. Deep Kick 03 (1).wav" spellcheck="false" />
+            <div id="rt-testout" class="dim tiny"></div>
+            <button class="act" id="rt-runnow">SORT WHAT'S THERE NOW</button>
+            <p class="dim tiny">Only files that arrive after you switch it on are moved, once their download has finished. Nothing is ever overwritten; clashes get a number. Every move can be undone.</p>
+          </div>
+        </div>
+        <div class="panel rt-rules">
+          <div class="panel-head"><span class="glyph">⌥</span> RULES <button class="chip mini right" id="rt-addrule">+ RULE</button></div>
+          <div id="rt-rulelist"></div>
+        </div>
+        <div class="panel rt-log">
+          <div class="panel-head"><span class="glyph">☰</span> ACTIVITY</div>
+          <div id="rt-loglist"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SENSES ============ -->
+    <section class="view" id="view-senses">
+      <div class="senses-grid">
+        <div class="panel">
+          <div class="panel-head"><span class="glyph">◉</span> MICROPHONE</div>
+          <div class="sense-body">
+            <div class="sense-row"><span>Privacy gate (all apps)</span><b id="s-mic-priv">—</b></div>
+            <div class="sense-row"><span>Input device mute</span><b id="s-mic-mute">—</b></div>
+            <div class="sense-row"><span>Input level</span><b id="s-mic-level">—</b></div>
+            <div class="sense-actions"><button class="act" id="s-mic-toggle">SEAL / OPEN MIC</button></div>
+            <div class="sub-head">APPS THAT HAVE LISTENED</div>
+            <div class="app-list" id="s-mic-apps"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="glyph">◎</span> CAMERA</div>
+          <div class="sense-body">
+            <div class="sense-row"><span>Privacy gate (all apps)</span><b id="s-cam-priv">—</b></div>
+            <div class="sense-row"><span>Hardware</span><b id="s-cam-dev">—</b></div>
+            <div class="sense-actions">
+              <button class="act" id="s-cam-toggle">SEAL / OPEN CAMERA</button>
+              <button class="act danger" id="s-cam-hard" title="Disables the camera device itself. Windows will ask for admin.">HARD KILL (ADMIN)</button>
+            </div>
+            <div class="sub-head">APPS THAT HAVE WATCHED</div>
+            <div class="app-list" id="s-cam-apps"></div>
+          </div>
+        </div>
+        <div class="panel wide">
+          <div class="panel-head"><span class="glyph">☲</span> HOW THE SHIELD WORKS</div>
+          <div class="lore">
+            <p><b>Soft seal</b> flips the Windows privacy switch for that sense, so no app can open it. On the mic it also mutes the input device, which silences apps that already had it open.</p>
+            <p><b>Hard kill</b> disables the camera in Device Manager, so the light can't come on. Windows asks for admin each time. Toggling the camera back on undoes it.</p>
+            <p><b>Hotkeys:</b> <code>Ctrl+Alt+Shift+M</code> mic &nbsp;·&nbsp; <code>Ctrl+Alt+Shift+C</code> camera. These work from any app while HYPERSPACE is running.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="view scroll" id="view-settings">
+      <div class="set-wrap">
+        <div class="set-tabs" id="set-tabs">
+          <button data-st="display" class="on">DISPLAY</button><button data-st="general">GENERAL</button><button data-st="crate">CRATE</button><button data-st="dock">SIDE DOCK</button><button data-st="about">ABOUT</button>
+        </div>
+        <div class="set-page" data-page="display" id="set-display"></div>
+        <div class="set-page hidden" data-page="general" id="set-general"></div>
+        <div class="set-page hidden" data-page="crate" id="set-crate"></div>
+        <div class="set-page hidden" data-page="dock" id="set-dock"></div>
+        <div class="set-page hidden" data-page="about" id="set-about"></div>
+      </div>
+    </section>
+
+    <!-- ============ NOTES (encrypted notebook + journal) ============ -->
+    <section class="view" id="view-notes"></section>
+
+    <!-- ============ TO-DO + quests ============ -->
+    <section class="view" id="view-todo"></section>
+
+    <!-- ============ GAMES ============ -->
+    <section class="view" id="view-games"></section>
+
+    <!-- ============ SEALED DIMENSIONS ============ -->
+    <section class="view" id="view-software">
+      <div class="sealed-view"><canvas class="sealed-canvas"></canvas>
+        <div class="sealed-text"><div class="glitch big" data-text="DIMENSION SEALED">DIMENSION SEALED</div><p>Software manager · installed apps, startup entities, updates</p><p class="dim">coming in a future release</p></div></div>
+    </section>
+    <section class="view" id="view-hardware"></section>
+  </main>
+
+  <footer class="statusbar">
+    <button id="sb-core" class="core-chip off" title="HyperCore status">CORE: —</button>
+    <span id="sb-temps"></span>
+    <span id="sb-self" title="GPU used by HYPERSPACE itself (busiest engine, like Task Manager)"></span>
+    <span id="sb-machine" class="wide-only">—</span>
+    <span id="sb-uptime">uptime —</span>
+    <span id="sb-drives" class="wide-only">—</span>
+    <span id="sb-batt"></span>
+    <span class="grow"></span>
+    <span id="sb-msg" class="msg">the veil is thin</span>
+  </footer>
+
+  <!-- vacuum hover plan -->
+  <div id="vac-tip" class="tip hidden"></div>
+
+  <!-- phone link -->
+  <div id="link-modal" class="modal hidden">
+    <div class="panel modal-box">
+      <div class="panel-head"><span class="glyph">⌬</span> PHONE LINK <button class="wbtn close right" id="link-close" aria-label="Close" title="Close">✕</button></div>
+      <div class="link-body">
+        <label class="check big"><input type="checkbox" id="link-enabled" /> serve HYPERSPACE to my phone on this Wi-Fi</label>
+        <div class="link-qr"><img id="link-qr" alt="" /><div id="link-off" class="dim">link is off</div></div>
+        <div id="link-sec" class="link-sec"></div>
+        <div id="link-urls" class="link-urls"></div>
+        <div class="link-actions"><button class="act" id="link-regen">NEW PAIRING KEY</button></div>
+        <p class="dim tiny">Scan with your phone camera. The pairing key is inside the QR code and only ever travels encrypted; anyone without it is refused, and 10 wrong tries lock that device out for 15 minutes. Only devices on your own Wi-Fi get an answer, and only on networks you've trusted. A new key unpairs every phone.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CRATE ⇩ GET: free SoundCloud track → folder → rekordbox -->
+  <div id="get-modal" class="modal hidden">
+    <div class="panel modal-box wide">
+      <div class="panel-head"><span class="glyph">⇩</span> GET A TRACK <span class="hint">SoundCloud link → klickaud.org → your folder → rekordbox</span><button class="wbtn close right" id="get-close" aria-label="Close" title="Close">✕</button></div>
+      <div class="get-row"><input id="get-url" class="rt-input" placeholder="paste a soundcloud.com track link" spellcheck="false" /><button class="act" id="get-look">LOOK UP</button></div>
+      <div id="get-card" class="get-card hidden"></div>
+      <div id="get-dest" class="get-dest hidden">
+        <label class="dim tiny">SAVE TO</label>
+        <div class="get-row">
+          <select id="get-folder"></select>
+          <input id="get-new" class="rt-input hidden" placeholder="new folder name (made in Music)" spellcheck="false" />
+          <button class="chip mini" id="get-browse" title="Pick any folder">BROWSE…</button>
+        </div>
+        <div class="dim tiny" id="get-pl"></div>
+        <button class="act big" id="get-go">⇩ GET IT</button>
+        <div class="dim tiny">A klickaud window opens with your link filled in: press <b>Convert</b>, then <b>Download</b>. HYPERSPACE catches the file, adds the cover and clean tags, and puts it in rekordbox the next time rekordbox is closed.</div>
+      </div>
+      <div class="get-jobs-head"><span class="dim tiny">DOWNLOADS</span><span class="dim tiny" id="get-queue"></span></div>
+      <div id="get-jobs"></div>
+    </div>
+  </div>
+
+  <!-- shortcut manager -->
+  <div id="sc-modal" class="modal hidden">
+    <div class="panel modal-box wide">
+      <div class="panel-head"><span class="glyph">⌨</span> SHORTCUTS <button class="wbtn close right" id="sc-close" aria-label="Close" title="Close">✕</button></div>
+      <div class="sc-new">
+        <input id="sc-label" class="rt-input" placeholder="name, e.g. Resolume: clear clip" spellcheck="false" />
+        <select id="sc-kind"><option value="keys">press keys</option><option value="open">open app / file / URL</option></select>
+        <input id="sc-rec" class="rt-input" placeholder="click here, press the combo (or type Ctrl+Alt+K)" spellcheck="false" />
+        <select id="sc-target"><option value="app">send to my last app</option><option value="system">send to Windows</option></select>
+        <input id="sc-open" class="rt-input hidden" placeholder="C:\Program Files\...\app.exe or https://…" spellcheck="false" />
+        <button class="act" id="sc-add">+ ADD</button>
+      </div>
+      <div class="sc-meta"><span id="sc-sortnote" class="dim tiny"></span><button class="chip mini" id="sc-reset">RESET USAGE COUNTS</button></div>
+      <div id="sc-list"></div>
+    </div>
+  </div>
+
+  <!-- process context menu + details -->
+  <div id="proc-menu" class="ctx-menu hidden"></div>
+  <div id="proc-info" class="modal hidden">
+    <div class="panel modal-box">
+      <div class="panel-head"><span class="glyph">⌬</span> ENTITY <span class="hint" id="pi-name"></span><button class="wbtn close right" id="pi-close" aria-label="Close" title="Close">✕</button></div>
+      <div class="core-rows" id="pi-rows"></div>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="remote.js"></script>
+  <script src="intro.js"></script>
+  <script src="accent.js"></script>
+  <script src="fx.js"></script>
+  <script src="app.js"></script>
+  <script src="afterburner.js"></script>
+  <script src="thermal.js"></script>
+  <script src="vj-themes.js"></script>
+  <script src="vj.js"></script>
+  <script src="deck.js"></script>
+  <script src="router.js"></script>
+  <script src="crate-engine.js"></script>
+  <script src="crate.js"></script>
+  <script src="crate-dj.js"></script>
+  <script src="widgets.js"></script>
+  <script src="settings.js"></script>
+<script src="notes.js"></script>
+<script src="todo.js"></script>
+<script src="games.js"></script>
+  <script src="hardware.js"></script>
+<script src="find.js"></script>
+  <script src="tabs.js"></script>
+</body>
+</html>
+
