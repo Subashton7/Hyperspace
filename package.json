@@ -16,8 +16,8 @@
     "core:x64": "node scripts/build-core.js x64",
     "dist": "node scripts/build-core.js x64 arm64 && electron-builder --win nsis zip --x64 --arm64 --publish never"
   },
-  "homepage": "https://github.com/Subashton7/hyperspace",
-  "repository": { "type": "git", "url": "https://github.com/Subashton7/hyperspace.git" },
+  "homepage": "https://github.com/Subashton7/Hyperspace",
+  "repository": { "type": "git", "url": "https://github.com/Subashton7/Hyperspace.git" },
   "license": "MIT",
   "devDependencies": {
     "@electron/fuses": "^2.1.3",
@@ -37,7 +37,7 @@
     "appId": "com.hyperspace.systemshaman",
     "productName": "HYPERSPACE",
     "copyright": "HYPERSPACE",
-    "publish": [{ "provider": "github", "owner": "Subashton7", "repo": "hyperspace", "releaseType": "release" }],
+    "publish": [{ "provider": "github", "owner": "Subashton7", "repo": "Hyperspace", "releaseType": "release" }],
     "directories": {
       "output": "installer"
     },

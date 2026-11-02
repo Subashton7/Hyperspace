@@ -44,7 +44,7 @@
 
 ## Updates for your friends (the UPDATE button)
 
-The app checks `https://github.com/Subashton7/hyperspace` (a **public** repo) for new Releases, every few hours and a
+The app checks `https://github.com/Subashton7/Hyperspace` (a **public** repo) for new Releases, every few hours and a
 little after it starts. Settings → General → UPDATES shows "Version X is ready" and an **UPDATE** button. One click
 downloads it and restarts into it. Notes and settings are not touched.
 
