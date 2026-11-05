@@ -9,7 +9,7 @@ const hw = require('./hardware');
 const { Core } = require('./core');
 const { Remote } = require('./remote');
 const { Router } = require('./router');
-const { usbTree } = require('./usb');
+const { usbTree, UsbHistory } = require('./usb');
 const { Tagger, analyze, fromName, clean: cleanName, AUDIO: AUDIO_FILE } = require('./tagger');
 const { SoundCloud } = require('./soundcloud');
 const { Grab } = require('./grab');
@@ -17,6 +17,7 @@ const { Vpn } = require('./vpn');
 const { SideDock } = require('./sidedock');
 const { NotesVault, isPrivate } = require('./notes');
 const { Updater } = require('./updater');
+const { loadAddons } = require('./addons');
 
 const ROOT = path.join(__dirname, '..');
 // HYPERSPACE's own pages: the only place the bridge to the laptop (preload → api) answers
@@ -32,6 +33,7 @@ if (!app.isPackaged && process.env.HS_USERDATA) app.setPath('userData', process.
 
 // ---------- config ----------
 const dataDir = app.getPath('userData');
+const usbHist = new UsbHistory(dataDir);
 const configFile = path.join(dataDir, 'config.json');
 const DEFAULTS = {
   fx: 'high',
@@ -381,7 +383,8 @@ const notes = new NotesVault({
     return {
       has: () => fs.existsSync(file) && fs.existsSync(coreExe),
       load: () => Buffer.from(execFileSync(coreExe, ['--dpapi', 'unprotect', file], { windowsHide: true, timeout: 15000 }).toString().trim(), 'base64'),
-      save: (k) => { if (fs.existsSync(coreExe)) execFileSync(coreExe, ['--dpapi', 'protect', file], { input: k.toString('base64'), windowsHide: true, timeout: 15000 }); },
+      // started in the background: waiting for HyperCore to start made every journal unlock hang for a second or more
+      save: (k) => { if (fs.existsSync(coreExe)) { const c = require('child_process').execFile(coreExe, ['--dpapi', 'protect', file], { windowsHide: true, timeout: 15000 }, () => {}); c.stdin.on('error', () => {}); c.stdin.end(k.toString('base64')); } },
     };
   })(),
 });
@@ -1345,6 +1348,44 @@ if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_NOTESTEST) { //
     fs.writeFileSync(path.join(dir, 'notes.json'), JSON.stringify(out, null, 1));
   }, 12000);
 }
+if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_NOTESLOOK) { // dev check: NOTES screen with sample pages, off-screen: console errors, what the sidebar and list show, a screenshot
+  setTimeout(async () => {
+    const dir = process.env.HS_NOTESLOOK, out = { errors: [] };
+    fs.writeFileSync(path.join(dir, 'trace.txt'), 'started ' + BrowserWindow.getAllWindows().map((x) => x.webContents.getURL()).join(' | '));
+    const tr = (m) => fs.appendFileSync(path.join(dir, 'trace.txt'), ' / ' + m);
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    app.on('before-quit', () => tr('before-quit')); process.on('exit', (c) => tr('exit ' + c));
+    app.on('render-process-gone', (e, wc, d) => tr('gone ' + JSON.stringify(d)));
+    try {
+      let w; for (let k = 0; k < 60 && !w; k++) { w = BrowserWindow.getAllWindows().find((x) => /index\.html/.test(x.webContents.getURL())); if (!w) await wait(500); }
+      w.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) out.errors.push(String(e.message).slice(0, 300)); });
+      w.webContents.on('preload-error', (e, f, er) => out.errors.push(String(er)));
+      tr('window found'); await wait(2000);
+      const js = (x) => w.webContents.executeJavaScript(x, true);
+      await js(`document.body.click()`); tr('clicked'); await wait(1500);
+      const shot = async (n) => fs.writeFileSync(path.join(dir, `look-${n}.png`), (await w.webContents.capturePage()).toPNG());
+      tr('create'); await api.notesCreate('purple monkey dishwasher 42', []);
+      await api.notesSave({ title: 'Shopping', notebook: 'Notes', body: '- pads, - cards' });
+      await api.notesSave({ title: 'Set ideas', notebook: 'DJ Notes', section: 'Halloween', body: '## Openers **bold** {c:#ff0|yellow} ++under++' });
+      await api.notesSave({ title: 'Old imported', notebook: 'Journal', section: '2024', body: 'x', journal: true, source: 'onenote-export' });
+      await api.notesSave({ title: 'Mon', notebook: 'Ashton', section: 'Journal', body: 'secret day' });
+      tr('saved'); broadcast('notes-state', notesState());
+      await js(`document.querySelector('.nav[data-view="notes"]').click()`); tr('navd'); await wait(2500);
+      fs.writeFileSync(path.join(dir, 'look.json'), JSON.stringify(out));
+      out.books = await js(`document.querySelector('#nt-books')?.innerText`);
+      out.list = await js(`[...document.querySelectorAll('#nt-list .nt-p b')].map((x) => x.textContent)`);
+      out.view = await js(`document.querySelector('#view-notes')?.innerText.slice(0, 300)`);
+      await shot('1-open');
+      tr('opened'); await js(`document.querySelector('#nt-list .nt-p')?.click()`); await wait(800); await shot('2-page');
+      out.edit = await js(`document.querySelector('#nt-edit')?.innerText.slice(0, 400)`);
+      notes.lock('locked'); await wait(1500);
+      out.lockedBooks = await js(`document.querySelector('#nt-books')?.innerText`);
+      await shot('3-locked');
+    } catch (e) { out.error = e.stack; }
+    fs.writeFileSync(path.join(dir, 'look.json'), JSON.stringify(out, null, 1));
+    setTimeout(() => app.exit(0), 500);
+  }, 8000);
+}
 if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_NOTESTYPE) { // dev check: typing into NOTES keeps every letter (the "everything deletes" bug), with real key input
   setTimeout(async () => {
     const dir = process.env.HS_NOTESTYPE, out = {};
@@ -1467,6 +1508,154 @@ if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_FINDTEST) { // 
     } catch (e) { out.error = e.stack; }
     fs.writeFileSync(path.join(process.env.HS_FINDTEST, 'find.json'), JSON.stringify(out, null, 1));
   }, 12000);
+}
+if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_SWEEP) { // dev check: visit TO-DO, SETTINGS, games, NOTES off-screen with the White Rabbit active; console errors + screenshots
+  setTimeout(async () => {
+    const dir = process.env.HS_SWEEP, out = { errors: [] };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      let w; for (let k = 0; k < 60 && !w; k++) { w = BrowserWindow.getAllWindows().find((x) => /index\.html/.test(x.webContents.getURL())); if (!w) await wait(500); }
+      w.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) out.errors.push(String(e.message).slice(0, 300)); });
+      const js = (x) => w.webContents.executeJavaScript(x, true);
+      const shot = async (n) => fs.writeFileSync(path.join(dir, `sw-${n}.png`), (await w.webContents.capturePage()).resize({ width: 1000 }).toPNG());
+      await wait(2500); await js(`document.body.click()`); await wait(1500);
+      await js(`window.twr && window.twr.setCfg({ on: true, found: true })`);
+      await api.notesCreate('purple monkey dishwasher 42', []);
+      await api.notesSave({ title: 'Shopping', notebook: 'Notes', body: 'pads' });
+      await api.notesSave({ title: '2024-03-04', notebook: 'Journal', section: 'Journal', body: 'secret day' });
+      broadcast('notes-state', notesState());
+      for (const v of ['notes', 'todo', 'settings']) { await js(`document.querySelector('.nav[data-view="${v}"]').click()`); await wait(4000); await shot(v); }
+      out.todoText = await js(`document.querySelector('#view-todo').innerText.slice(0, 500)`);
+      out.settingsTiles = await js(`[...document.querySelectorAll('#view-settings *')].filter((e) => /GLITCH|casino/i.test(e.textContent) && e.children.length < 3).length`);
+      await js(`document.dispatchEvent(new CustomEvent('twr',{detail:{do:'saved'}}))`); await wait(1200); await shot('rabbit-saved');
+      await js(`window.twr.popBehind('panel')`); await wait(1500); await shot('rabbit-pop');
+      out.hasTwr = await js(`typeof window.twr`);
+      out.twrApi = await js(`JSON.stringify({ antics: (window.twr.antics || []).length, cat: Object.keys(window.TWR_CATALOG || {}), lvl: window.twr.level && window.twr.level() })`);
+      await js(`document.querySelector('.nav[data-view="settings"]').click()`); await wait(1500);
+      out.twrTab = await js(`(() => { const b = [...document.querySelectorAll('#view-settings button')].find((x) => /WHITE RABBIT/i.test(x.textContent)); if (!b) return 'no tab'; b.click(); return 'clicked'; })()`); await wait(2500); await shot('twr-tab');
+      await js(`window.twr.stage.demo('dance')`); await wait(1200); await shot('twr-dance');
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control', ctrlKey: true, bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: '6', code: 'Digit6', ctrlKey: true, bubbles: true })); window.dispatchEvent(new KeyboardEvent('keydown', { key: '7', code: 'Digit7', ctrlKey: true, bubbles: true }))`); await wait(800);
+      for (let i = 0; i < 20; i++) await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))`);
+      await wait(800); await shot('hacker');
+      await js(`window.hsHacker && window.hsHacker.close()`);
+      await js(`document.querySelector('.nav[data-view="nexus"]').click()`); await wait(3000);
+      out.home = await js(`JSON.stringify({ rect: window.twr.home && window.twr.home(), pt: window.twr.homePoint && window.twr.homePoint(), fx: !!window.hsClickFx })`);
+      await shot('home');
+      await js(`document.querySelector('.nav[data-view="vj"]').click()`); await wait(300);
+      await js(`window.hsClickFx && window.hsClickFx.burst(600, 300, 'button')`); await wait(250); await shot('clickfx');
+      await js(`document.querySelector('.nav[data-view="crate"]').click()`); await wait(2500); await shot('crate');
+      await js(`window.twr.assistant.open()`); await wait(600);
+      out.cmd = await js(`(async () => { try { return String(await window.twr.assistant.run('joke')).slice(0, 120); } catch (e) { return 'ERR ' + e.message; } })()`); await wait(700); out.ast = await js(`(() => { const a = document.querySelector('#twr-ast'), h = document.querySelector('#twr-home'); const r = (e) => e && { disp: getComputedStyle(e).display, rect: JSON.stringify(e.getBoundingClientRect()), top: (() => { const b = e.getBoundingClientRect(); const t = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return t && (t.id || t.className || t.tagName); })() }; return JSON.stringify({ ast: r(a), home: r(h), win: [innerWidth, innerHeight] }); })()`); await shot('assistant');
+      await js(`document.querySelector('#view-games') && (document.querySelector('.nav[data-view="games"]').click())`); await wait(1500); await shot('games');
+    } catch (e) { out.error = e.stack; }
+    fs.writeFileSync(path.join(dir, 'sweep.json'), JSON.stringify(out, null, 1));
+    setTimeout(() => app.exit(0), 500);
+  }, 8000);
+}
+if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_WELCOME) { // dev check: first-run welcome quiz, every step (off-screen); screenshots + console errors in HS_WELCOME folder
+  setTimeout(async () => {
+    const dir = process.env.HS_WELCOME, out = { errors: [] };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      let w; for (let k = 0; k < 60 && !w; k++) { w = BrowserWindow.getAllWindows().find((x) => /index\.html/.test(x.webContents.getURL())); if (!w) await wait(500); }
+      w.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) out.errors.push(String(e.message).slice(0, 300)); });
+      const js = (x) => w.webContents.executeJavaScript(x, true);
+      const shot = async (n) => fs.writeFileSync(path.join(dir, `wq-${n}.png`), (await w.webContents.capturePage()).resize({ width: 1000 }).toPNG());
+      await wait(2500);
+      await js(`window.hsWelcome.open()`); await wait(900);
+      await shot('1-vibe');
+      await js(`document.querySelector('#hsw [data-id="playful"]').click()`); await wait(200);
+      for (const [n, pickId] of [['2-uses', 'music'], ['3-anim', 'full'], ['4-sound', 'silent'], ['5-help', 'yes'], ['6-dock', 'off'], ['7-accent', 'pink'], ['8-surprises', 'meet']]) {
+        await js(`document.querySelector('#hsw-next').click()`); await wait(300);
+        await js(`(() => { const c = document.querySelector('#hsw [data-id="${pickId}"]'); if (c) c.click(); })()`); await wait(250);
+        await shot(n);
+      }
+      await js(`document.querySelector('#hsw-next').click()`); await wait(400); await shot('9-summary');
+      await js(`document.querySelector('#hsw-go').click()`); await wait(800); await shot('10-after');
+      out.stored = await js(`JSON.stringify({ w: localStorage.getItem('hs-welcome'), done: localStorage.getItem('hs-welcome-done'), intro: localStorage.getItem('intro'), hid: localStorage.getItem('hs-nav-hidden'), eggs: localStorage.getItem('hs-eggs'), view: localStorage.getItem('view'), click: localStorage.getItem('hs-clickfx') })`);
+    } catch (e) { out.error = e.stack; }
+    fs.writeFileSync(path.join(dir, 'welcome.json'), JSON.stringify(out, null, 1));
+    setTimeout(() => app.exit(0), 500);
+  }, Number(process.env.HS_WELCOME_WAIT || 8000));
+}
+if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_GAMEHUB) { // dev check: GAMING hub tabs off-screen; console errors + screenshots (never launches a game)
+  setTimeout(async () => {
+    const dir = process.env.HS_GAMEHUB, out = { errors: [] };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      let w; for (let k = 0; k < 60 && !w; k++) { w = BrowserWindow.getAllWindows().find((x) => /index\.html/.test(x.webContents.getURL())); if (!w) await wait(500); }
+      w.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) out.errors.push(String(e.message).slice(0, 300)); });
+      const js = (x) => w.webContents.executeJavaScript(x, true);
+      const shot = async (n) => fs.writeFileSync(path.join(dir, `gh-${n}.png`), (await w.webContents.capturePage()).resize({ width: 1000 }).toPNG());
+      await wait(3000); await js(`document.body.click()`); await wait(1500);
+      await js(`document.querySelector('.nav[data-view="gamehub"]').click()`); await wait(6000);
+      out.gm = await api.gmTest();
+      for (const t of ['library', 'mode', 'play', 'perf', 'tools']) { await js(`document.querySelector('.gh-tabs [data-t="${t}"]').click()`); await wait(2500); await shot(t); }
+      await api.gmSet({ settings: { overlay: { on: true }, crosshair: { on: true, hotkey: true }, track: true } }); await wait(800);
+      out.status = await api.gmStatus();
+      await api.gmSet({ settings: { overlay: { on: false }, crosshair: { on: false, hotkey: false }, track: false } }); await wait(500);
+      out.status2 = await api.gmStatus();
+      out.sample = await js(`JSON.stringify(window.hsGameHub.state.d.games.slice(0, 6).map((g) => [g.id, g.name, (g.exes || []).join('|'), g.size]))`);
+      out.tabsText = await js(`document.querySelector('#view-gamehub').innerText.slice(0, 300)`);
+    } catch (e) { out.error = e.stack; }
+    fs.writeFileSync(path.join(dir, 'gamehub.json'), JSON.stringify(out, null, 1));
+    setTimeout(() => app.exit(0), 500);
+  }, 8000);
+}
+if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_CRATEVJ) { // dev check: CRATE > VJ section, VJ FULL + mini player, show presets (off-screen); console errors + screenshots
+  setTimeout(async () => {
+    const dir = process.env.HS_CRATEVJ, out = { errors: [] };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      let w; for (let k = 0; k < 60 && !w; k++) { w = BrowserWindow.getAllWindows().find((x) => /index\.html/.test(x.webContents.getURL())); if (!w) await wait(500); }
+      w.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) out.errors.push(String(e.message).slice(0, 300)); });
+      const js = (x) => w.webContents.executeJavaScript(x, true);
+      const shot = async (n) => fs.writeFileSync(path.join(dir, `cv-${n}.png`), (await w.webContents.capturePage()).resize({ width: 1000 }).toPNG());
+      await wait(2500); await js(`document.body.click()`); await wait(1500);
+      await js(`document.querySelector('.nav[data-view="crate"]').click()`); await wait(1500); await shot('1-library');
+      out.navVjHidden = await js(`document.querySelector('.nav[data-view="vj"]').classList.contains('hidden')`);
+      await js(`document.querySelector('#cr-secseg [data-sec="vj"]').click()`); await wait(2500); await shot('2-vj-section');
+      out.afterSection = await js(`JSON.stringify({ view: HS.view, sec: HS.crateSection, inVJ: HS.inVJ(), cls: document.body.classList.contains('vj-mode'), canvases: document.querySelectorAll('#vj-canvas').length })`);
+      await js(`document.querySelector('#cr-fill').click()`); await wait(2000); await shot('3-vj-full');
+      out.mini = await js(`JSON.stringify({ hidden: document.querySelector('#cr-mini').classList.contains('hidden'), corner: document.querySelector('#cr-mini').dataset.corner })`);
+      await js(`document.querySelector('#vj-controls').scrollTop = 0; (() => { const h = [...document.querySelectorAll('#vj-controls h5')].find((x) => /SHOW PRESETS/.test(x.textContent)); h && h.scrollIntoView(); })()`);
+      await js(`document.querySelector('#vj-spname').value = 'drop one'; document.querySelector('#vj-spsave').click()`); await wait(300);
+      await js(`document.querySelector('[data-theme]') && document.querySelectorAll('[data-theme]')[3].click()`); await wait(300);
+      await js(`document.querySelector('#vj-spname').value = 'second'; document.querySelector('#vj-spsave').click()`); await wait(300);
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }))`); await wait(300);
+      out.presets = await js(`localStorage.getItem('hs-vj-presets').length + ' ' + document.querySelectorAll('#vj-splist [data-sp]').length + ' theme=' + document.querySelector('#vj-theme-name').textContent`);
+      await shot('4-presets');
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await wait(500);
+      out.afterEsc = await js(`document.querySelector('#cr-mini').classList.contains('hidden') + ' ' + document.querySelector('.crate').classList.contains('vj-full')`);
+      await js(`window.showView ? 0 : 0; document.querySelector('.nav[data-view="vj"]').click()`); await wait(600);
+      out.redirect = await js(`HS.view + ' ' + HS.crateSection`);
+      await js(`document.querySelector('#cr-secseg [data-sec="lib"]').click()`); await wait(800); await shot('5-back-to-library');
+    } catch (e) { out.error = e.stack; }
+    fs.writeFileSync(path.join(dir, 'cratevj.json'), JSON.stringify(out, null, 1));
+    setTimeout(() => app.exit(0), 500);
+  }, 8000);
+}
+if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_SMART) { // dev check: CRATE smart playlists (off-screen)
+  setTimeout(async () => {
+    const dir = process.env.HS_SMART, out = { errors: [] };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      let w; for (let k = 0; k < 60 && !w; k++) { w = BrowserWindow.getAllWindows().find((x) => /index\.html/.test(x.webContents.getURL())); if (!w) await wait(500); }
+      w.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) out.errors.push(String(e.message).slice(0, 300)); });
+      const js = (x) => w.webContents.executeJavaScript(x, true);
+      await wait(2500); await js(`document.body.click()`); await wait(1500);
+      await js(`document.querySelector('.nav[data-view="crate"]').click()`); await wait(2500);
+      out.nav = await js(`[...document.querySelectorAll('#cr-nav .cr-item[data-kind="smart"]')].map((b) => b.textContent).join(' | ')`);
+      await js(`document.querySelector('#cr-sm-new').click()`); await wait(400);
+      await js(`document.querySelector('#cr-smart [data-act="addg"]').click()`); await wait(200);
+      out.count = await js(`document.querySelector('#sm-count').textContent`);
+      fs.writeFileSync(path.join(dir, 'smart-1.png'), (await w.webContents.capturePage()).resize({ width: 800 }).toPNG());
+      await js(`document.querySelector('#sm-save').click()`); await wait(600);
+      out.view = await js(`document.querySelector('#cr-title').textContent + ' / ' + document.querySelector('#cr-meta').textContent + ' / ' + localStorage.getItem('hs-crate-smart').length`);
+    } catch (e) { out.error = e.stack; }
+    fs.writeFileSync(path.join(dir, 'smart.json'), JSON.stringify(out, null, 1));
+    setTimeout(() => app.exit(0), 500);
+  }, 8000);
 }
 if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_UITEST) { // dev check: COOLING, FIND and the games
   setTimeout(async () => {
@@ -1856,6 +2045,8 @@ const api = {
     if (!notes.exists()) await notes.syncAll().catch(() => {});
     const r = await notes.unlock(secret, { recovery: !!recovery });
     broadcast('notes-state', notesState());
+    // tidy-up and copying happen after the unlock answers, so the password box never waits for them
+    notes.relaxImported().then((n) => { if (n) broadcast('notes-state', { ...notesState(), count: -1 }); }).catch(() => {});
     notes.syncAll().catch(() => {});
     return r;
   },
@@ -2012,7 +2203,8 @@ const api = {
     return r.canceled ? null : r.filePaths[0];
   },
   routerUndo: (id) => router.undo(id),
-  usbTree: () => usbTree(coreExe),
+  usbTree: async () => { const t = await usbTree(coreExe); try { t.newDevices = usbHist.record(t); } catch {} return t; },
+  usbHistory: () => usbHist.list(),
   // your own names for the sockets ("LEFT FRONT"): portNames() reads, portNames({ id, name }) sets
   portNames: (set) => {
     if (set && typeof set.id === 'string') {
@@ -2116,6 +2308,7 @@ const api = {
   dockMouse: (open) => { dock.mouse(open); return true; },
   dockDrag: (phase) => (phase === 'start' ? (dock.dragStart(), true) : dock.dragEnd()),
   dockLayer: () => dock.toggleLayer(),
+  dockTyping: (on) => dock.typing(on),
   dockData: (key, value) => {
     dockSend('dock-data', { key, value });
     if (key === 'crate') { crateNow = value; remote.broadcast('crate-now', value); } // phones see the laptop's player too
@@ -2126,6 +2319,15 @@ const api = {
   crateRemote: (action, arg) => { if (win && !win.isDestroyed()) win.webContents.send('ev', 'dock-cmd', { key: 'crate', action, arg }); return true; },
   crateNow: () => crateNow,
   dockSummon: () => { summon(false); return true; },
+  // note-usage log shared by the notes page and the dock window (their localStorage is separate): { noteId: [timestamps, last 36 h] }
+  notesUse: (id) => {
+    if (typeof id !== 'string' || !id || id.length > 80) return false;
+    const u = (config.notesUse && typeof config.notesUse === 'object') ? config.notesUse : (config.notesUse = {}), now = Date.now(), cut = now - 36 * 36e5;
+    for (const k of Object.keys(u)) { u[k] = (Array.isArray(u[k]) ? u[k] : []).filter((t) => t > cut); if (!u[k].length) delete u[k]; }
+    (u[id] ||= []).push(now); saveConfig(); return true;
+  },
+  notesUseList: () => { const u = (config.notesUse && typeof config.notesUse === 'object') ? config.notesUse : {}, cut = Date.now() - 36 * 36e5, o = {}; for (const k of Object.keys(u)) { const a = (Array.isArray(u[k]) ? u[k] : []).filter((t) => t > cut); if (a.length) o[k] = a; } return o; },
+  dockOpenView: (v) => { if (win && !win.isDestroyed()) win.webContents.send('ev', 'open-view', String(v)); return true; },
   vpnStatus: () => { vpn.start(); return vpn.state; },
   vpnOpen: (provider) => vpnOpen(provider),
   vpnWgInfo: async () => { const i = wgInfo(); let state = null; if (i.installed && i.profile && core.online) state = (await core.call('vpn.wg', { action: 'status', name: i.profile.name }).catch(() => null))?.state || null; return { installed: i.installed, profile: i.profile, state }; },
@@ -2188,6 +2390,24 @@ const api = {
     return vjImages();
   },
 };
+// optional extras from the `personal/` folder (absent in the public copy)
+const addons = loadAddons(ROOT, { app, config, saveConfig, broadcast, dialog, shell, win: () => win });
+for (const [k, fn] of Object.entries(addons.api)) if (!Object.hasOwn(api, k)) api[k] = fn;
+// GAMING hub: library scan, launch, playtime sessions, overlay windows (all gm* calls)
+const gaming = require('./gaming')({ app, shell, dialog, screen, BrowserWindow, globalShortcut, dataDir, getWin: () => win, broadcast, getPerf, getProcs: () => getProcesses({ gpu: false }), getTele: () => lastTelemetry });
+for (const [k, fn] of Object.entries(gaming.api)) if (!Object.hasOwn(api, k)) api[k] = fn;
+app.whenReady().then(() => gaming.start());
+// Sidebar order + open tab strip, kept in a plain JSON file as a backup to localStorage (which Chromium writes lazily
+// and can lose on a hard quit). Sync read at page start (preload), sync write on every change.
+const UI_STATE_FILE = path.join(dataDir, 'ui-state.json');
+const readUiState = () => { try { const o = JSON.parse(fs.readFileSync(UI_STATE_FILE, 'utf8')); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
+ipcMain.on('uistate-get', (e) => { e.returnValue = ownPage(e.senderFrame?.url) ? readUiState() : {}; });
+ipcMain.on('uistate-set', (e, key, val) => {
+  if (!ownPage(e.senderFrame?.url) || !['navOrder', 'tabs'].includes(key)) return;
+  const o = readUiState(); if (val == null) delete o[key]; else o[key] = val;
+  try { fs.mkdirSync(dataDir, { recursive: true }); fs.writeFileSync(UI_STATE_FILE + '.tmp', JSON.stringify(o)); fs.renameSync(UI_STATE_FILE + '.tmp', UI_STATE_FILE); } catch {}
+});
+ipcMain.on('addons', (e) => { e.returnValue = ownPage(e.senderFrame?.url) ? addons.list : []; });
 remote.api = {
   config: () => phoneConfig(),
   setConfig: async (patch) => { const p = {}; for (const k of ['preset', 'fans']) if (patch && k in patch) p[k] = patch[k]; await api.setConfig(p); return phoneConfig(); },
@@ -2293,6 +2513,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: Math.min(1500, wa.width), height: Math.min(940, wa.height), minWidth: Math.min(960, wa.width), minHeight: Math.min(560, wa.height),
     frame: false, backgroundColor: '#000400', title: 'HYPERSPACE',
+    show: !(!app.isPackaged && process.env.HS_SNAPSHOT),
     icon: path.join(ROOT, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false,
@@ -2300,6 +2521,7 @@ function createWindow() {
       autoplayPolicy: 'no-user-gesture-required', // the startup animation's synthesized sound
     },
   });
+  try { require('./spell').attach(win, local); } catch (e) { console.error('spell check', e.message); }
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'), process.env.HS_SNAPSHOT ? { query: { intro: process.env.HS_INTRO || 'silent' } } : {});
   // a fresh launch comes up on top too (the intro plays on its own)
   if (!process.env.HS_SNAPSHOT) win.once('ready-to-show', () => summon(false));
@@ -2315,6 +2537,9 @@ function createWindow() {
 
   // Dev aid: HS_SNAPSHOT=<file.png> saves a screenshot after boot, then quits.
   if (process.env.HS_SNAPSHOT) {
+    // dev test runs must never pop up over what you're doing: show the window far off-screen, without taking focus
+    // (a hidden window paints too slowly for screenshots). Tests that need real key input call win.show() themselves.
+    win.setPosition(-32000, -32000); win.showInactive();
     const log = [];
     if (process.env.HS_SIZE) { const [w, h] = process.env.HS_SIZE.split(',').map(Number); win.setMinimumSize(320, 480); win.setSize(w, h); }
     win.webContents.on('console-message', (e, level, message) => log.push(e.message || message));
@@ -2379,7 +2604,15 @@ function summon(replay) {
   setTimeout(() => { if (win && !win.isDestroyed()) win.setAlwaysOnTop(false); }, 1200);
   if (replay) win.webContents.send('ev', 'summon', {});
 }
-app.on('second-instance', () => summon(true));
+// nsKey.action: 'summon' (default) | 'dock' | 'both'. The key agent starts a second HYPERSPACE; its trigger count tells us it was the Nitro key.
+let lastKeyTriggers = 0;
+app.on('second-instance', () => {
+  const t = keyStatus().triggers || 0, fromKey = t > lastKeyTriggers; lastKeyTriggers = t;
+  const act = nsCfg().action || 'summon';
+  if (fromKey && act !== 'summon') { dock.toggle(); if (act === 'dock') return; }
+  summon(true);
+  setTimeout(() => dock.raise(), 1400);
+});
 
 if (app.isPackaged && ['remote-debugging-port', 'remote-debugging-pipe', 'inspect', 'inspect-brk', 'js-flags'].some((x) => app.commandLine.hasSwitch(x))) app.exit(1);
 app.whenReady().then(async () => {
@@ -2406,7 +2639,23 @@ app.whenReady().then(async () => {
   setTimeout(() => { spoutTick(); setInterval(spoutTick, 5000); }, process.env.HS_SNAPSHOT ? 0 : 8000);
   setTimeout(startWall, process.env.HS_SNAPSHOT ? 0 : 8000);
   if (nsCfg().enabled) applyKeyAgent(false);
-  if (dock.cfg().enabled && (!process.env.HS_SNAPSHOT || process.env.HS_DOCKTEST)) { vpn.start(); setTimeout(() => dock.apply(), process.env.HS_SNAPSHOT ? 0 : 3000); }
+  if (dock.cfg().enabled && (!process.env.HS_SNAPSHOT || process.env.HS_DOCKTEST)) {
+    vpn.start();
+    if (process.env.HS_SNAPSHOT) setTimeout(() => dock.apply(), 0);
+    else {
+      // wait for the intro to finish (body.booting gone), at most 12 s; no wait when the intro is off or lite
+      const introOff = false; // intro 'off' / lite: body.booting never appears, so the poll below passes at once
+      const t0 = Date.now(); let started = false;
+      const go = () => { if (started) return; started = true; dock.apply(); };
+      const poll = setInterval(async () => {
+        if (started) return clearInterval(poll);
+        let done = Date.now() - t0 > 12000 || introOff;
+        try { if (!done && win && !win.isDestroyed()) done = await win.webContents.executeJavaScript("document.readyState==='complete' && !!document.body && !document.body.classList.contains('booting')"); } catch {}
+        if (done) { clearInterval(poll); setTimeout(go, 600); }
+      }, 500);
+    }
+  }
+  try { if (!process.env.HS_SNAPSHOT) globalShortcut.register(config.dockHotkey || 'CommandOrControl+Alt+D', () => dock.toggle()); } catch {}
   // the key watcher can be ended from outside (an installer run from a script, Task Manager): bring it back
   if (!process.env.HS_SNAPSHOT) setInterval(() => { if (nsCfg().enabled && !keyStatus().running) applyKeyAgent(false); }, 60000);
   protocol.handle('hsmedia', async (req) => {
@@ -2438,3 +2687,27 @@ app.on('window-all-closed', () => {
   hw.stopHelper();
   app.quit();
 });
+if (!app.isPackaged && process.env.HS_SNAPSHOT && process.env.HS_CRATE2) { // dev check: MUSIC section tiles, Alt+1/2/3, coach strip, big play button (off-screen)
+  setTimeout(async () => {
+    const dir = process.env.HS_CRATE2, out = { errors: [] };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      let w; for (let k = 0; k < 60 && !w; k++) { w = BrowserWindow.getAllWindows().find((x) => /index\.html/.test(x.webContents.getURL())); if (!w) await wait(500); }
+      w.webContents.on('console-message', (e) => { if (e.level === 'error' || e.level === 3) out.errors.push(String(e.message).slice(0, 300)); });
+      const js = (x) => w.webContents.executeJavaScript(x, true);
+      const shot = async (n) => fs.writeFileSync(path.join(dir, `c2-${n}.png`), (await w.webContents.capturePage()).resize({ width: 900 }).toPNG());
+      const alt = (k) => js(`window.dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', altKey: true, bubbles: true }))`);
+      await wait(2500); await js(`document.body.click()`); await wait(1500);
+      out.nav = await js(`document.querySelector('.nav[data-view="crate"] span').textContent`);
+      await js(`document.querySelector('.nav[data-view="crate"]').click()`); await wait(1500); await shot('1-lib');
+      out.coach = await js(`!document.querySelector('#cr-coach').classList.contains('hidden')`);
+      await alt('2'); await wait(800); out.dj = await js(`document.querySelector('#view-crate').dataset.section + ' ' + CRATE.C.mode`); await shot('2-dj');
+      await alt('3'); await wait(800); out.vj = await js(`document.querySelector('#view-crate').dataset.section + ' ' + HS.inVJ()`); await shot('3-vj');
+      await alt('1'); await wait(800); out.lib = await js(`document.querySelector('#view-crate').dataset.section + ' ' + CRATE.C.mode`);
+      out.big = await js(`document.querySelector('#cr-playall').textContent`);
+      await js(`document.querySelector('#cr-coach-x').click()`); out.coachGone = await js(`document.querySelector('#cr-coach').classList.contains('hidden') + ' ' + localStorage.getItem('hs-crate-coach')`);
+    } catch (e) { out.error = e.stack; }
+    fs.writeFileSync(path.join(dir, 'crate2.json'), JSON.stringify(out, null, 1));
+    setTimeout(() => app.exit(0), 500);
+  }, 8000);
+}

@@ -98,3 +98,36 @@ body.lite *, body.lite *::before, body.lite *::after { animation: none !importan
 .m-btns .v-tog.on { background: none; color: var(--g-hot); }
 .m-btns .hidden { display: none; }
 .v-msg { font-size: 10px; opacity: 0.8; }
+
+.n-text { width: 100%; margin-top: 5px; resize: none; background: rgba(0, 12, 5, .85); color: #d8ffe6; border: 1px solid var(--edge); padding: 5px 6px; font: 11px/1.4 var(--mono); box-sizing: border-box; }
+.n-text:focus { outline: none; border-color: var(--g-mid); }
+.n-save { color: #001a08 !important; background: var(--g, #00ff6e); font-weight: 700; }
+
+/* drag to reorder */
+#sd-mods { position: relative; }
+#sd-mods .m { transition: transform 0.18s cubic-bezier(.2, .9, .25, 1); }
+#sd-mods .m-h { cursor: grab; }
+#sd-mods.reordering, #sd-mods.reordering .m-h { cursor: grabbing; }
+#sd-mods .m.lifted { transition: none; position: relative; z-index: 5; border-color: var(--amber); box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6), 0 0 14px rgba(255, 196, 0, 0.45); background: rgba(0, 20, 8, 0.96); }
+.dk-mark { position: absolute; left: 0; right: 0; height: 2px; background: var(--amber); box-shadow: 0 0 8px var(--amber); pointer-events: none; z-index: 6; }
+body.lite #sd-mods .m { transition: none !important; }
+
+.n-title { font-size: 10px; color: var(--g-hot); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n-mode { flex: 2 !important; }
+
+/* TO-DO */
+.m-link { cursor: pointer; }
+.m-link:hover { color: var(--g-hot); text-decoration: underline; }
+.t-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.t-row button { color: var(--g-mid); font-size: 13px; line-height: 1; padding: 0 2px; }
+.t-row button:hover { color: var(--g); text-shadow: 0 0 6px var(--g); }
+.t-row span { flex: 1; min-width: 0; }
+.t-new { width: 100%; margin-top: 5px; background: rgba(0, 12, 5, .85); color: #d8ffe6; border: 1px solid var(--edge); padding: 4px 6px; font: 11px var(--mono); }
+.t-new:focus { outline: none; border-color: var(--g-mid); }
+
+/* a dropped module settles with a small bounce */
+@keyframes sd-settle { 0% { transform: scale(1.04); } 45% { transform: scale(0.98); } 100% { transform: scale(1); } }
+#sd-mods .m.settle { animation: sd-settle .5s ease-out; }
+/* TO-DO header pulses amber when the list is long */
+@keyframes sd-pulse-warn { 0%, 100% { color: var(--g-mid); text-shadow: none; } 50% { color: var(--amber); text-shadow: 0 0 8px var(--amber); } }
+.m-h.pulse-warn { animation: sd-pulse-warn 1.8s ease-in-out infinite; }

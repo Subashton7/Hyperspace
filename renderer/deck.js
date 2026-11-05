@@ -4,6 +4,8 @@
   let media = null;
   let showVirtual = false;
   let pending = null; // { token, until }
+  // DECK now lives inside MUSIC (CRATE > DECK); the old DECK tab is gone
+  const inDeck = () => HS.view === 'deck' || (HS.view === 'crate' && HS.crateSection === 'deck');
 
   const ICONS = {
     speakers: '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
@@ -49,7 +51,7 @@
   new ResizeObserver(sizeMeter).observe(meter);
   let meterOn = false;
   function drawMeter() {
-    if (HS.view !== 'deck') { meterOn = false; return; } // no frames while another tab shows (HS.onView restarts it)
+    if (!inDeck()) { meterOn = false; return; } // no frames while another tab shows (HS.onView restarts it)
     requestAnimationFrame(drawMeter);
     if (!spec) return;
     const ctx = meter.getContext('2d');
@@ -61,8 +63,8 @@
       ctx.fillRect(i * bw + 1, meter.height - h, bw - 2, h);
     }
   }
-  const startMeter = () => { if (!meterOn && HS.view === 'deck') { meterOn = true; requestAnimationFrame(drawMeter); } };
-  HS.onView(startMeter);
+  const startMeter = () => { if (!meterOn && inDeck()) { meterOn = true; requestAnimationFrame(drawMeter); } };
+  HS.onView(startMeter); window.addEventListener('hs-crate-section', startMeter);
   startMeter();
 
   // ---------------- transport ----------------
@@ -168,22 +170,97 @@
   });
   hs.on('display-reverted', () => { toast('DISPLAY REVERTED'); $('#keep-bar').classList.add('hidden'); pending = null; setTimeout(refreshDisplays, 800); });
 
+
+  // ---------------- scenes (one click sets volume / output / mute / screens) ----------------
+  const SKEY = 'hs-deck-scenes';
+  const GLYPHS = ['★', '☾', '⊘', '♫', '▶', '◈', '⚡', '☀', '✦'];
+  const loadScenes = () => {
+    try { const a = JSON.parse(localStorage.getItem(SKEY)); if (Array.isArray(a)) return a; } catch {}
+    return [
+      { name: 'GIG', icon: '⚡', key: '1', level: 70, muted: false },
+      { name: 'LATE NIGHT', icon: '☾', key: '2', level: 20, muted: false },
+      { name: 'MUTE ALL', icon: '⊘', key: '3', muted: true },
+    ];
+  };
+  let scenes = loadScenes();
+  let renaming = -1;
+  const saveScenes = () => { try { localStorage.setItem(SKEY, JSON.stringify(scenes)); } catch {} };
+  const sp = document.createElement('div');
+  sp.className = 'panel deck-scenes';
+  sp.style.gridColumn = '1 / -1';
+  sp.innerHTML = `<div class="panel-head"><span class="glyph">◈</span> SCENES <span class="hint">one click sets volume, output, mute and screens · right-click to rename / delete</span></div>
+    <div id="sc-list" style="display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 12px 12px;align-items:center">
+      <input id="sc-name" maxlength="20" placeholder="scene name" style="width:140px" />
+      <select id="sc-icon">${GLYPHS.map((g) => `<option>${g}</option>`).join('')}</select>
+      <select id="sc-key" title="hotkey on this tab"><option value="">no hotkey</option>${[1,2,3,4,5,6,7,8,9].map((n) => `<option>${n}</option>`).join('')}</select>
+      <button class="act" id="sc-save">SAVE CURRENT AS SCENE</button>
+    </div>`;
+  document.querySelector('#view-deck .deck-grid').appendChild(sp);
+  function renderScenes() {
+    $('#sc-list').innerHTML = scenes.length ? scenes.map((s, i) => `<button class="act" data-sc="${i}" title="${s.key ? 'hotkey ' + s.key : ''}">${esc(s.icon || '◈')} ${esc(s.name)}${s.key ? ` <span class="dim tiny">[${esc(s.key)}]</span>` : ''}</button>`).join('') : '<span class="dim">no scenes yet</span>';
+  }
+  async function applyScene(s) {
+    const done = [];
+    try {
+      if (s.level != null || s.muted != null) {
+        const a = {}; if (s.level != null) a.level = s.level / 100; if (s.muted != null) a.muted = !!s.muted;
+        vol = await coreCall('audio.volume', a); renderVol(); done.push('volume');
+      }
+      if (s.output) { await coreCall('audio.default', { id: s.output }); refreshOutputs(); refreshVol(); done.push('output'); }
+      if (s.topology) { const r = await coreCall('display.topology', { mode: s.topology }); armKeep(r.token); setTimeout(refreshDisplays, 1500); done.push('screens'); }
+      toast(`SCENE ${s.name}${done.length ? ' · ' + done.join(' + ') : ''}`);
+    } catch (e) { toast(e.message, true); }
+  }
+  $('#sc-list').addEventListener('click', (e) => { const b = e.target.closest('[data-sc]'); if (b && scenes[+b.dataset.sc]) applyScene(scenes[+b.dataset.sc]); });
+  $('#sc-list').addEventListener('contextmenu', (e) => {
+    const b = e.target.closest('[data-sc]'); if (!b || !window.hsMenu) return;
+    const i = +b.dataset.sc;
+    hsMenu(e, [
+      { label: 'Rename', run: () => { renaming = i; $('#sc-name').value = scenes[i].name; $('#sc-name').focus(); toast('type the new name, then press SAVE'); } },
+      { label: 'Delete', danger: true, run: () => { scenes.splice(i, 1); saveScenes(); renderScenes(); } },
+    ], scenes[i].name);
+  });
+  $('#sc-save').addEventListener('click', async () => {
+    const name = $('#sc-name').value.trim().slice(0, 20);
+    if (!name) return toast('give the scene a name first', true);
+    if (renaming >= 0 && scenes[renaming]) { scenes[renaming].name = name; renaming = -1; saveScenes(); renderScenes(); $('#sc-name').value = ''; return toast('RENAMED'); }
+    await refreshVol();
+    const s = { name, icon: $('#sc-icon').value, key: $('#sc-key').value || '', level: Math.round((vol?.level ?? 0) * 100), muted: !!vol?.muted };
+    try { const d = await coreCall('audio.devices'); const o = d.outputs.find((x) => x.isDefault); if (o) s.output = o.id; } catch {}
+    try { const d = await coreCall('display.list'); if (d.topology) s.topology = d.topology; } catch {}
+    if (s.key) scenes.forEach((x) => { if (x.key === s.key) x.key = ''; });
+    const at = scenes.findIndex((x) => x.name === name);
+    if (at >= 0) scenes[at] = s; else scenes.push(s);
+    saveScenes(); renderScenes(); $('#sc-name').value = ''; toast(`SCENE ${name} SAVED`);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!inDeck() || e.ctrlKey || e.altKey || e.metaKey || !/^[1-9]$/.test(e.key)) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable) return;
+    const s = scenes.find((x) => x.key === e.key); if (s) applyScene(s);
+  });
+  renderScenes();
+
   // ---------------- lifecycle ----------------
   const leaseId = hs.remote ? `phone-deck-${Math.random().toString(36).slice(2, 7)}` : 'deck';
   function enter() {
     refreshVol(); refreshOutputs(); refreshDisplays();
     coreCall('media.get').then(renderMedia).catch(() => {});
   }
-  HS.onView((v) => {
-    if (v === 'deck') enter();
-    hs.call('audioLease', leaseId, v === 'deck').catch(() => {});
-  });
+  let wasIn = false;
+  const lifecycle = () => {
+    const on = inDeck();
+    if (on && !wasIn) enter();
+    if (on !== wasIn) hs.call('audioLease', leaseId, on).catch(() => {});
+    wasIn = on;
+  };
+  HS.onView(lifecycle); window.addEventListener('hs-crate-section', lifecycle);
   setInterval(() => {
-    if (HS.view === 'deck') hs.call('audioLease', leaseId, true).catch(() => {});
+    if (inDeck()) hs.call('audioLease', leaseId, true).catch(() => {});
     if (HS.core.state === 'online') refreshVol(); // the volume widget can sit on any page
   }, 4000);
   HS.actions.media = (a) => coreCall('media.cmd', { action: a }).then(renderMedia).catch((e) => toast(e.message, true));
   HS.actions.mute = () => $('#deck-mute').click();
   HS.actions.volume = (v) => coreCall('audio.volume', { level: v }).then((r) => { vol = r; renderVol(); }).catch(() => {});
-  hs.on('core', (s) => { if (s.state === 'online' && HS.view === 'deck') enter(); });
+  hs.on('core', (s) => { if (s.state === 'online' && inDeck()) enter(); });
 })();

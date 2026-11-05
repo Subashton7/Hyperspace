@@ -198,7 +198,7 @@
   $('#sg-widgets').addEventListener('click', () => { showView('nexus'); $('#widgets-btn').click(); });
 
   // ---------------- SIDE DOCK ----------------
-  const DOCK_NAMES = { clock: '◷ CLOCK', vpn: '⛨ VPN STATUS', temps: '☢ TEMPS', thermals: '♨ TEMP HISTORY (30 MIN GRAPH)', cpu: '✺ CPU', gpu: '◈ GPU', ram: '▤ MEMORY', fans: '❋ FANS', net: '⇅ NETWORK', disk: '⛁ DISK ACTIVITY', drives: '⛃ DRIVE SPACE', apps: '⚙ TOP APPS', media: '▶ NOW PLAYING (WINDOWS)', crate: '◎ CRATE PLAYER', volume: '♫ VOLUME', shield: '⟁ MIC / CAM', battery: '⌁ BATTERY', uptime: '⏱ UPTIME' };
+  const DOCK_NAMES = { clock: '◷ CLOCK', vpn: '⛨ VPN STATUS', temps: '☢ TEMPS', thermals: '♨ TEMP HISTORY (30 MIN GRAPH)', cpu: '✺ CPU', gpu: '◈ GPU', ram: '▤ MEMORY', fans: '❋ FANS', net: '⇅ NETWORK', disk: '⛁ DISK ACTIVITY', drives: '⛃ DRIVE SPACE', apps: '⚙ TOP APPS', media: '▶ NOW PLAYING (WINDOWS)', crate: '◎ CRATE PLAYER', volume: '♫ VOLUME', shield: '⟁ MIC / CAM', battery: '⌁ BATTERY', uptime: '⏱ UPTIME', notes: '✎ QUICK NOTE', todo: '✔ TO-DO' };
   let dk = null;
   async function renderDock() {
     try { dk = await call('dockGet'); } catch { return; }
@@ -271,11 +271,46 @@
         <div><span>logs</span><b class="sel-text">${esc(i.logDir || '')}</b></div>
         <div><span>Electron · Chromium · Node</span><b>${esc([i.electron, i.chrome, i.node].join(' · '))}</b></div>
       </div>
-      <div class="core-actions" style="padding:10px 0 0"><button class="act" id="ab-open">OPEN SETTINGS FOLDER</button><button class="act" id="ab-logs">OPEN LOGS</button></div>
+      <div class="core-actions" style="padding:10px 0 0"><button class="act" id="ab-open">OPEN SETTINGS FOLDER</button><button class="act" id="ab-logs">OPEN LOGS</button><button class="act" id="ab-new">WHAT'S NEW</button><button class="act" id="ab-quiz">RETAKE SETUP QUIZ</button><button class="act" id="ab-tips">TIPS TUTORIAL</button></div>
     </div></div>`;
     $('#ab-open').addEventListener('click', () => call('openDir', 'data'));
     $('#ab-logs').addEventListener('click', () => call('openDir', 'logs'));
+    $('#ab-new').addEventListener('click', () => window.HS_WHATSNEW && window.HS_WHATSNEW(i.version));
+    $('#ab-quiz').addEventListener('click', () => window.hsWelcome && window.hsWelcome.open({ retake: true }));
+    $('#ab-tips').addEventListener('click', () => window.hsTips && window.hsTips.tutorial());
   }
 
   HS.onView((v) => { if (v === 'settings') { sync(); markGen(); renderAbout(); renderDock(); } });
+})();
+
+// SETTINGS extras: the GLITCH IN THE FEED quest tile (the quest UI itself lives in todo.js) and a hidden-style casino door.
+(() => {
+  const host = document.querySelector('#set-general');
+  if (!host) return;
+  const grid = host.querySelector('.set-grid') || host;
+  grid.insertAdjacentHTML('beforeend', '<div class="panel set-card" id="set-quest" style="grid-column: 1 / -1"><div class="panel-head"><span class="glyph">&#11042;</span> GLITCH IN THE FEED &middot; DE-BIG-TECH QUEST <span class="hint">leave big tech, one quest at a time</span><button class="chip mini right" id="sq-toggle">OPEN</button></div><div class="set-body set-quest-body" id="sq-body" hidden></div></div>');
+  const body = document.getElementById('sq-body'), tg = document.getElementById('sq-toggle');
+  const flip = (open) => {
+    body.hidden = !open; tg.textContent = open ? 'CLOSE' : 'OPEN';
+    if (open) window.hsQuestMount?.(body); else window.hsQuestMount?.(null);
+  };
+  tg.addEventListener('click', () => flip(body.hidden));
+  // the casino: a dim little tile at the foot of GENERAL
+  grid.insertAdjacentHTML('beforeend', '<div class="panel set-card" id="set-casino" style="opacity:.45"><div class="panel-head"><span class="glyph">&#127920;</span> casino <span class="hint">psst</span></div><div class="set-body"><p class="dim tiny">Blackjack, poker and spades with play chips. No real money, nothing online.</p><button class="act" id="casino-go">ENTER THE CASINO</button></div></div>');
+  const go = () => showView('games');
+  document.getElementById('casino-go').addEventListener('click', go);
+  // typing the word "casino" anywhere outside a text box opens it too
+  let buf = '';
+  document.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+    buf = (buf + e.key.toLowerCase()).slice(-6);
+    if (buf === 'casino') { buf = ''; go(); }
+  });
+  // five quick clicks on the Settings button in the sidebar also work
+  let clicks = [];
+  document.querySelector('.nav[data-view="settings"]')?.addEventListener('click', () => {
+    const n = Date.now(); clicks = clicks.filter((x) => n - x < 3000); clicks.push(n);
+    if (clicks.length >= 5) { clicks = []; go(); }
+  });
 })();

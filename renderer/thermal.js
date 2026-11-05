@@ -248,3 +248,106 @@
   new ResizeObserver(() => { if (visible()) draw(); }).observe(canvas.parentElement);
   loop();
 })();
+
+// THERMAL ALERTS: watches CPU / graphics temperature from the live telemetry. A reading that stays over the WARN or HOT
+// line for the sustained time raises a toast and a rabbit remark (then stays quiet for the cooldown). A small LAST HOUR
+// sparkline (the hottest of the two, one point per 10 s, seeded from the saved thermal history) shows the alert marks.
+(() => {
+  const host = document.querySelector('.ab-cool');
+  const DEF = { on: true, cpuWarn: 85, cpuHot: 92, gpuWarn: 85, gpuHot: 92, sustain: 10, cooldown: 5 };
+  const cfg = () => ({ ...DEF, ...(HS.config.thermalAlerts || {}) });
+  const BUCKET = 10e3, HOUR = 3600e3;
+  const ring = [];           // [t, maxTemp] one per 10 s
+  let marks = [];            // [t, 'warn' | 'hot' | 'test']
+  try { marks = JSON.parse(localStorage.getItem('thermalMarks') || '[]').filter((m) => Date.now() - m[0] < HOUR); } catch {}
+  const saveMarks = () => { try { localStorage.setItem('thermalMarks', JSON.stringify(marks.slice(-60))); } catch {} };
+  const state = { cpu: { level: null, since: 0, last: {} }, gpu: { level: null, since: 0, last: {} } };
+
+  function addPoint(t, v) {
+    const b = Math.floor(t / BUCKET) * BUCKET, last = ring[ring.length - 1];
+    if (last && last[0] === b) last[1] = Math.max(last[1], v); else ring.push([b, v]);
+    while (ring.length && t - ring[0][0] > HOUR) ring.shift();
+  }
+  // history the main process already keeps (survives restarts): fill the graph at start-up
+  hs.call('thermalHistory', Date.now() - HOUR).then((rows) => {
+    const seed = [];
+    for (const r of rows || []) { const v = Math.max(r[1] ?? -1, r[2] ?? -1); if (v < 0) continue; const b = Math.floor(r[0] / BUCKET) * BUCKET, l = seed[seed.length - 1]; if (l && l[0] === b) l[1] = Math.max(l[1], v); else seed.push([b, v]); }
+    const first = ring[0]?.[0] ?? Infinity;
+    ring.unshift(...seed.filter((p) => p[0] < first));
+    draw();
+  }).catch(() => {});
+
+  function raise(sensor, level, temp, test = false) {
+    const name = sensor === 'cpu' ? 'CPU' : 'GRAPHICS';
+    const msg = test ? 'TEST ALERT · THIS IS HOW A HEAT WARNING LOOKS' : level === 'hot' ? `${name} IS HOT · ${temp}°C · FANS TO MAX OR EASE OFF THE LOAD` : `${name} RUNNING WARM · ${temp}°C`;
+    toast(msg, level !== 'warn');
+    try { document.dispatchEvent(new CustomEvent('twr', { detail: { say: test ? 'Test alert. If this were real, the laptop would be sweating.' : level === 'hot' ? `Operator, the ${name.toLowerCase()} is at ${temp} degrees. That is hot.` : `The ${name.toLowerCase()} is warming up: ${temp} degrees.` } })); } catch {}
+    marks.push([Date.now(), test ? 'test' : level]); saveMarks(); draw();
+  }
+
+  hs.on('telemetry', (t) => {
+    const now = Date.now(), c = cfg();
+    const cpu = t.cpu?.temp, gpu = t.gpuTemp;
+    const mx = Math.max(cpu ?? -1, gpu ?? -1);
+    if (mx >= 0) addPoint(now, mx);
+    if (!c.on) return;
+    for (const [k, v] of [['cpu', cpu], ['gpu', gpu]]) {
+      const s = state[k];
+      const lvl = v == null ? null : v >= c[`${k}Hot`] ? 'hot' : v >= c[`${k}Warn`] ? 'warn' : null;
+      if (lvl !== s.level) { s.level = lvl; s.since = now; }
+      if (lvl && now - s.since >= c.sustain * 1000 && now - (s.last[lvl] || 0) >= c.cooldown * 60e3) {
+        s.last[lvl] = now;
+        if (lvl === 'hot') s.last.warn = now; // a hot alert also covers the warn level for the cooldown
+        raise(k, lvl, v);
+      }
+    }
+    if (HS.view === 'afterburner') draw();
+  });
+
+  if (!host) return;
+  const box = document.createElement('div');
+  box.className = 'ta-box';
+  box.innerHTML = `<div class="ta-head"><b>THERMAL ALERTS</b><label class="switch"><input type="checkbox" id="ta-on" /><span></span></label><span class="sp"></span><button class="chip mini" id="ta-test">TEST ALERT</button></div>
+    <div class="ta-set">
+      <label>CPU warn <input type="number" id="ta-cpuWarn" min="50" max="110" /> hot <input type="number" id="ta-cpuHot" min="50" max="115" /> °C</label>
+      <label>GPU warn <input type="number" id="ta-gpuWarn" min="50" max="110" /> hot <input type="number" id="ta-gpuHot" min="50" max="115" /> °C</label>
+      <label>sustained <input type="number" id="ta-sustain" min="1" max="120" /> s</label>
+      <label>cooldown <input type="number" id="ta-cooldown" min="1" max="60" /> min</label>
+    </div>
+    <canvas id="ta-graph"></canvas><div class="ta-cap"><span>LAST HOUR · hottest of CPU / GPU · one point per 10 s</span><span>amber = warn · red = hot alert</span></div>`;
+  host.appendChild(box);
+  const q = (id) => box.querySelector(`#ta-${id}`);
+  function fill() { const c = cfg(); q('on').checked = c.on; for (const k of ['cpuWarn', 'cpuHot', 'gpuWarn', 'gpuHot', 'sustain', 'cooldown']) q(k).value = c[k]; }
+  fill();
+  box.addEventListener('change', (e) => {
+    const c = cfg(), id = e.target.id.replace('ta-', '');
+    if (id === 'on') c.on = e.target.checked;
+    else if (id in DEF) { const v = Number(e.target.value); if (!Number.isFinite(v)) return fill(); c[id] = v; }
+    // the hot line can never sit under the warn line
+    c.cpuHot = Math.max(c.cpuHot, c.cpuWarn); c.gpuHot = Math.max(c.gpuHot, c.gpuWarn);
+    HS.saveConfig({ thermalAlerts: c });
+    fill(); draw();
+  });
+  q('test').addEventListener('click', () => raise('cpu', 'hot', cfg().cpuHot, true));
+
+  const cv = q('graph');
+  function draw() {
+    if (!cv.offsetWidth) return;
+    const dpr = window.devicePixelRatio || 1, w = cv.offsetWidth, h = 70, now = Date.now();
+    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const x = cv.getContext('2d'), c = cfg();
+    x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
+    const lo = 30, hi = Math.max(105, ...ring.map((p) => p[1] + 3));
+    const X = (t) => w - ((now - t) / HOUR) * w, Y = (v) => h - 4 - ((v - lo) / (hi - lo)) * (h - 10);
+    x.setLineDash([3, 4]); x.lineWidth = 1;
+    for (const [v, col] of [[Math.min(c.cpuWarn, c.gpuWarn), 'rgba(255,196,0,.45)'], [Math.min(c.cpuHot, c.gpuHot), 'rgba(255,60,60,.5)']]) { x.strokeStyle = col; x.beginPath(); x.moveTo(0, Y(v)); x.lineTo(w, Y(v)); x.stroke(); }
+    x.setLineDash([]);
+    x.strokeStyle = '#00ff6e'; x.lineWidth = 1.5; x.beginPath();
+    ring.forEach((p, i) => { const gap = i && p[0] - ring[i - 1][0] > 3 * BUCKET; (i && !gap) ? x.lineTo(X(p[0]), Y(p[1])) : x.moveTo(X(p[0]), Y(p[1])); });
+    x.stroke();
+    marks = marks.filter((m) => now - m[0] < HOUR);
+    for (const [t, kind] of marks) { x.fillStyle = kind === 'hot' ? '#ff3c3c' : kind === 'warn' ? '#ffc400' : '#c77dff'; x.beginPath(); x.moveTo(X(t), 2); x.lineTo(X(t) - 4, 10); x.lineTo(X(t) + 4, 10); x.fill(); x.fillRect(X(t) - 0.5, 10, 1, h - 10); }
+  }
+  HS.onView((v) => { if (v === 'afterburner') setTimeout(draw, 60); });
+  window.addEventListener('resize', () => { if (HS.view === 'afterburner') draw(); });
+})();

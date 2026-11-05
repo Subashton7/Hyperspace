@@ -330,3 +330,59 @@ main { grid-area: main; z-index: 3; position: relative; overflow: hidden; paddin
 
 /* Acer-only controls (fan curves, Acer profiles, NitroSense key) hide on other PCs, and their stand-in note hides on Acers */
 body.no-acer .acer-only, body:not(.no-acer) .no-acer-only { display: none !important; }
+
+/* ---------- sidebar reorder mode (sidebar.js) ---------- */
+.side-foot { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.side-btn { width: 62px; padding: 3px 0; font-size: 8px; letter-spacing: 1px; color: var(--g-dim); border: 1px solid var(--panel-edge); border-radius: 3px; background: transparent; text-shadow: none; }
+.side-btn:hover, .side.reorder .side-btn:first-child { color: var(--g-hot); border-color: var(--g-mid); background: rgba(0, 255, 110, .08); }
+.side.reorder .nav:not(.hidden) { cursor: grab; touch-action: none; user-select: none; outline: 1px dashed rgba(0, 255, 110, .25); }
+.side.reorder .nav:hover svg { transform: none; }
+.nav { user-select: none; }
+.nav.dragging { opacity: .45; cursor: grabbing; }
+.nav.drop-before::after, .nav.drop-after::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: #b36bff; box-shadow: 0 0 8px #b36bff, 0 0 2px #fff; border-radius: 2px; }
+.nav.drop-before::after { top: -3px; }
+.nav.drop-after::after { bottom: -3px; }
+
+/* ---------- sidebar tiles: cooler hover (scan sweep, neon edge, icon pop, 3D tilt, ripple, active aura). transform/opacity only ---------- */
+.nav { transition: color .2s, background .2s, transform .35s cubic-bezier(.34, 1.56, .64, 1); }
+.nav:hover { transform: perspective(240px) rotateX(var(--nx-rx, 0deg)) rotateY(var(--nx-ry, 0deg)) scale(1.06); }
+.nav .nx-fx { position: absolute; inset: 0; overflow: hidden; border-radius: 3px; pointer-events: none; z-index: 0; }
+.nx-fx::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 45%; background: linear-gradient(to bottom, transparent, rgba(130, 255, 190, .4), transparent); opacity: 0; transform: translateY(-120%); }
+.nav:hover .nx-fx::before { animation: nxScan .75s ease-out; }
+@keyframes nxScan { 0% { transform: translateY(-120%); opacity: 1; } 100% { transform: translateY(260%); opacity: 0; } }
+.nx-fx::after { content: ''; position: absolute; inset: 0; border: 1px solid var(--g); border-radius: 3px; box-shadow: inset 0 0 10px rgba(0, 255, 110, .55), 0 0 8px rgba(0, 255, 110, .5); opacity: 0; transform: scale(.88); transition: opacity .25s, transform .4s cubic-bezier(.34, 1.56, .64, 1); }
+.nav:hover .nx-fx::after { opacity: .85; transform: scale(1); }
+.nav:not(.active):hover svg { animation: nxPop .7s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes nxPop { 0% { transform: scale(1) rotate(0); } 45% { transform: scale(1.4) rotate(190deg); } 100% { transform: scale(1.18) rotate(360deg); } }
+.nav span { transition: transform .3s cubic-bezier(.34, 1.56, .64, 1), color .2s, text-shadow .2s; position: relative; z-index: 1; }
+.nav svg { position: relative; z-index: 1; }
+.nav:hover span { transform: scale(1.1) translateY(1px); color: var(--g-hot); text-shadow: 0 0 10px rgba(0, 255, 110, .9); }
+.nav.active .nx-fx::after { opacity: .5; animation: nxAura 2.4s ease-in-out infinite; }
+@keyframes nxAura { 0%, 100% { opacity: .25; transform: scale(.94); } 50% { opacity: .85; transform: scale(1); } }
+.nx-rip { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; border: 1px solid var(--g-hot); opacity: 0; animation: nxRip .6s ease-out; }
+@keyframes nxRip { from { transform: scale(1); opacity: .9; } to { transform: scale(9); opacity: 0; } }
+.side.reorder .nav:hover { transform: none; }
+.side.reorder .nav:hover svg { animation: none; }
+.nav.dragging .nx-fx { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .nav:hover, .nav:hover span { transform: none; }
+  .nav:not(.active):hover svg, .nav:hover .nx-fx::before, .nav.active .nx-fx::after { animation: none; }
+}
+
+/* ---------- moved sections (FILE ROUTER / SENSES under OPERATIONS, HARDWARE under FANS) ---------- */
+.nav.moved { display: none !important; }
+.sec-fold { margin: 14px 0 6px; border: 1px solid var(--panel-edge); background: rgba(0, 20, 8, .35); }
+.sec-fold > summary { cursor: pointer; padding: 10px 14px; font: normal 700 12px var(--display); letter-spacing: 3px; color: var(--g-hot); list-style: none; user-select: none; }
+.sec-fold > summary::-webkit-details-marker { display: none; }
+.sec-fold > summary::before { content: '▸'; display: inline-block; margin-right: 10px; transition: transform .15s; }
+.sec-fold[open] > summary::before { transform: rotate(90deg); }
+.sec-fold > summary:hover { background: rgba(0, 255, 110, .08); }
+.sec-fold > .sec-body { display: block; height: auto; padding: 0 12px 14px; animation: none; overflow: visible; }
+.sec-fold .senses-grid, .sec-fold .router-grid { height: auto; }
+.sec-fold #view-hardware { overflow: visible; }
+/* AI tab */
+.ai-wrap { max-width: 1280px; margin: 0 auto; padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 14px; }
+.ai-soon-h { font: normal 700 12px var(--display); letter-spacing: 3px; color: var(--g-hot); margin: 6px 0 10px; }
+.ai-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.ai-card { opacity: .75; border-style: dashed; }
+.ai-card p { padding: 4px 14px 14px; margin: 0; }

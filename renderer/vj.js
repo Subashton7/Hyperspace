@@ -23,18 +23,20 @@
     img: 'none', imgMode: 'center', imgSize: 0.6, imgMix: 0.85, imgPulse: 1, imgSpin: 0, imgTint: false,
     cpuSpin: true, cpuSpinAmt: 0.6, cpuComplex: false, gpuGlow: true, gpuGlitch: true, gpuAmt: 0.6,
     reactUi: false,
+    // loop production: structure (build/drop), camera + glitch + bloom punch, loop clock for recording
+    structure: 'audio', clockBpm: 128, loopBars: 8, shake: 0.45, zoomPunch: 0.55, datamosh: 0.4, bloom: 0.5, kaleidoFx: false,
     quality: 'balanced', fps: 60,
   };
   // Render resolution vs the screen. Bloom, trails and feedback blur hide the upscale, and the
   // integrated GPU pays per pixel: BALANCED costs ~40% of ULTRA.
   const QUALITY = { eco: 0.45, balanced: 0.65, ultra: 1 };
-  const CATS = { SIGNATURE: 'SIGNATURE', SACRED: 'SACRED GEOMETRY', YANTRA: 'YANTRAS', HYPER: 'HYPERDIMENSIONAL', COSMIC: 'COSMIC', AUDIO: 'AUDIO-REACTIVE' };
+  const CATS = { LOOP: 'LOOP PRODUCTION', SIGNATURE: 'SIGNATURE', SACRED: 'SACRED GEOMETRY', YANTRA: 'YANTRAS', HYPER: 'HYPERDIMENSIONAL', COSMIC: 'COSMIC', AUDIO: 'AUDIO-REACTIVE' };
   // colour worlds: base hue + drift, or a full cycle; sat 0 = white light
   const PALETTES = {
     matrix: { label: 'MATRIX', base: 140, spread: 14 }, acid: { label: 'ACID', base: 82, spread: 22 },
     aqua: { label: 'AQUA', base: 172, spread: 18 }, ultraviolet: { label: 'ULTRAVIOLET', base: 278, spread: 22 },
     inferno: { label: 'INFERNO', base: 14, spread: 20 }, gold: { label: 'GOLD', base: 44, spread: 9 },
-    duo: { label: 'GREEN × MAGENTA', duo: [140, 305] }, subashton: { label: 'SUBASHTON', duo: [180, 325] },
+    neon: { label: 'CYAN · PINK · PURPLE', tri: [186, 322, 272] }, duo: { label: 'GREEN × MAGENTA', duo: [140, 305] }, subashton: { label: 'SUBASHTON', duo: [180, 325] },
     spectrum: { label: 'DMT SPECTRUM', cycle: true },
     mono: { label: 'WHITE LIGHT', base: 140, spread: 0, sat: 0 },
   };
@@ -48,6 +50,7 @@
   // ---------------- audio + hardware inputs ----------------
   const A = { bass: 0, mid: 0, treble: 0, level: 0, beat: 0, spec: new Array(48).fill(0), beats: 0, last: 0, silent: true };
   hs.on('audio', (d) => {
+    if (S.structure === 'clock') return; // the loop clock plays its own drums
     const k = S.sensitivity;
     A.bass = Math.min(1.5, d.b[0] * k * S.bass);
     A.mid = Math.min(1.5, d.b[1] * k * S.mid);
@@ -75,6 +78,7 @@
   const H = (t, off = 0) => {
     const p = PALETTES[S.palette] || PALETTES.matrix;
     if (p.cycle) return (t * 24 + off * 47 + S.hue + 3600) % 360;
+    if (p.tri) return p.tri[Math.abs(Math.round(off)) % 3] + S.hue + Math.sin(t * 0.3 + off) * 6;
     if (p.duo) return p.duo[Math.abs(Math.round(off)) % 2] + S.hue + Math.sin(t * 0.2 + off) * 8;
     return p.base + S.hue + Math.sin(t * 0.2 + off) * p.spread;
   };
@@ -392,7 +396,7 @@
       gl_FragColor = vec4(max(prev, g), 1.0);
     }`;
   const FS_OUT = `precision mediump float; varying vec2 v;
-    uniform sampler2D uTex; uniform vec2 uRes; uniform float uAspect, uTime, uK, uChroma, uGlow, uGlitch, uFlash, uHue, uSpout, uMirror, uStrobe;
+    uniform sampler2D uTex; uniform vec2 uRes, uShake; uniform float uAspect, uTime, uK, uChroma, uGlow, uGlitch, uFlash, uHue, uSpout, uMirror, uStrobe, uPunch, uMosh, uBloom, uBuild, uInv;
     float hash(float n){ return fract(sin(n)*43758.5453); }
     vec3 hueShift(vec3 col, float a){
       const vec3 k = vec3(0.57735);
@@ -402,7 +406,7 @@
     void main(){
       // Spout: flip so readPixels returns rows top-first
       vec2 vv = vec2(v.x, mix(v.y, 1.0 - v.y, uSpout));
-      vec2 uv = vv;
+      vec2 uv = (vv - 0.5) / (1.0 + uPunch) + 0.5 + uShake; // zoom punch + camera shake
       // mirror: 1 left|right, 2 top|bottom, 3 all four quarters
       if (uMirror > 0.5 && uMirror < 1.5) uv.x = 0.5 - abs(uv.x - 0.5);
       else if (uMirror > 1.5 && uMirror < 2.5) uv.y = 0.5 - abs(uv.y - 0.5);
@@ -418,17 +422,34 @@
         float n = hash(band + floor(uTime * 12.0));
         if (n < uGlitch * 0.3) uv.x += (hash(band * 1.7 + uTime) - 0.5) * 0.12 * uGlitch;
       }
-      vec2 dir = (uv - 0.5) * uChroma * 0.03;
+      float chromaK = uChroma;
+      if (uMosh > 0.01) { // datamosh: blocks that slip and freeze into chunky pixels, plus torn scanline slices
+        float stp = floor(uTime * 14.0);
+        vec2 cell = floor(uv * vec2(18.0, 10.0));
+        float h = hash(cell.x * 13.1 + cell.y * 7.7 + stp);
+        if (h < uMosh * 0.22) {
+          uv += (vec2(hash(h * 91.0 + 1.0), hash(h * 37.0 + 2.0)) - 0.5) * 0.14 * uMosh;
+          if (h < uMosh * 0.06) uv = floor(uv * 36.0) / 36.0;
+        }
+        float band2 = floor(uv.y * 40.0);
+        if (hash(band2 * 3.1 + stp) < uMosh * 0.12) uv.x += (hash(band2 + stp * 2.0) - 0.5) * 0.2 * uMosh;
+        chromaK += uMosh * 0.9;
+      }
+      vec2 dir = (uv - 0.5) * chromaK * 0.03;
       vec3 col = vec3(texture2D(uTex, uv + dir).r, texture2D(uTex, uv).g, texture2D(uTex, uv - dir).b);
-      vec3 bl = vec3(0.0);
+      vec3 bl = vec3(0.0), far = vec3(0.0);
       for (int i = 0; i < 8; i++) {
         float a = float(i) * 0.785398;
         vec2 o = vec2(cos(a), sin(a)) / uRes;
         bl += texture2D(uTex, uv + o * 5.0).rgb + texture2D(uTex, uv + o * 13.0).rgb;
+        if (uBloom > 0.01) far += texture2D(uTex, uv + o * 30.0).rgb;
       }
       col += (bl / 16.0) * uGlow * 1.8;
+      col += max(far / 8.0 - 0.05, 0.0) * uBloom * 3.2; // wide bloom: only what is already bright spills
       col = hueShift(col, uHue);
       col += uFlash * vec3(0.12, 0.3, 0.16) + uStrobe * vec3(0.85);
+      col += uBuild * vec3(0.0, 0.05, 0.07) * (1.0 - length(vv - 0.5) * 1.3);
+      col = mix(col, vec3(1.0) - col, uInv);
       float vig = smoothstep(1.25, 0.35, length((vv - 0.5) * vec2(uAspect, 1.0)));
       col *= vig * (0.93 + 0.07 * sin(vv.y * uRes.y * 1.5708));
       // Spout wants BGRA: swap channels so the bytes read back are already in sender order
@@ -491,12 +512,82 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
+  // ---------------- structure: build-ups and drops ----------------
+  // 'audio': listens for a swell (level + treble climbing over a few seconds) and for the kick that lands after it or
+  // after a quiet gap. 'clock': plays a synthetic drum loop at clockBpm: groove, then a build over the second half
+  // of the phrase (loopBars long), a dropped kick before the drop, then the drop on bar 1. That makes loops that
+  // start on a drop, build, and are exactly loopBars * 240 / bpm seconds long.
+  const ST = { build: 0, drop: 0, ct: 0, lvlF: 0, lvlS: 0, trF: 0, trS: 0, quietAt: -99, lastDrop: -99, phrase: -1, seen: 0, lastBeat: 0, ival: 0.5, beatPh: 0, vbeat: -1 };
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  function structure(dt) {
+    ST.ct += dt;
+    if (S.structure === 'clock') {
+      const beat = (ST.ct * S.clockBpm) / 60, bars = Math.max(4, S.loopBars), bar = beat / 4, bp = (bar % bars) / bars, ph = Math.floor(bar / bars);
+      if (ph !== ST.phrase) { ST.phrase = ph; ST.drop = 1; ST.build = 0; }
+      ST.build = bp > 0.5 ? clamp01((bp - 0.5) / 0.46) : 0;
+      const bf = beat % 1, fb = Math.floor(beat);
+      const gap = bp > 0.97; // the last beat of the phrase: the kick drops out, just the riser
+      if (fb !== ST.vbeat) { ST.vbeat = fb; if (!gap) { A.beat = 1; A.beats++; } }
+      const kick = gap ? 0 : Math.exp(-bf * 6), hat = Math.exp(-((bf + 0.5) % 1) * 14);
+      A.bass = (0.25 + 0.75 * kick) * (1 - ST.build * 0.25) + ST.drop * 0.4;
+      A.mid = 0.3 + 0.25 * Math.sin(ST.ct * 2.1) + ST.build * 0.35;
+      A.treble = 0.2 + hat * 0.45 + ST.build * 0.7;
+      A.level = 0.45 + 0.3 * kick + ST.build * 0.4;
+      A.silent = false; A.last = performance.now();
+      for (let i = 0; i < 48; i++) A.spec[i] = 255 * clamp01((A.bass * Math.exp(-i / 6) + A.mid * 0.6 * Math.exp(-(((i - 16) / 8) ** 2)) + A.treble * 0.55 * Math.exp(-(((i - 36) / 10) ** 2))) * (0.82 + 0.18 * Math.sin(ST.ct * 9 + i * 1.7)));
+      ST.beatPh = bf; ST.ival = 60 / S.clockBpm;
+    } else if (S.structure === 'audio') {
+      const kF = 1 - Math.exp(-dt / 0.35), kS = 1 - Math.exp(-dt / 6);
+      ST.lvlF += (A.level - ST.lvlF) * kF; ST.lvlS += (A.level - ST.lvlS) * kS;
+      ST.trF += (A.treble - ST.trF) * kF; ST.trS += (A.treble - ST.trS) * kS;
+      const up = (ST.trF > ST.trS * 1.15 && ST.lvlF > ST.lvlS * 0.95) || ST.lvlF > ST.lvlS * 1.3;
+      ST.build = clamp01(ST.build + (up && !A.silent ? dt / 5 : -dt / 2.5));
+      if (ST.lvlF < ST.lvlS * 0.45 && ST.lvlS > 0.08) ST.quietAt = ST.ct;
+      if (A.beats !== ST.seen) {
+        ST.seen = A.beats;
+        const iv = ST.ct - ST.lastBeat; ST.lastBeat = ST.ct;
+        if (iv > 0.25 && iv < 1.2) ST.ival = ST.ival * 0.8 + iv * 0.2;
+        if (A.bass > 0.85 && (ST.build > 0.5 || ST.ct - ST.quietAt < 2.5) && ST.ct - ST.lastDrop > 8) { ST.drop = 1; ST.build = 0; ST.lastDrop = ST.ct; }
+      }
+      ST.beatPh = clamp01((ST.ct - ST.lastBeat) / ST.ival);
+    } else { ST.build = 0; ST.beatPh = 0; }
+    ST.drop = Math.max(0, ST.drop - dt / 1.2);
+  }
+  // loop recording: the clock restarts at bar 1, quality goes to ULTRA, and exactly loopBars of it are saved as a WebM
+  let rec = null;
+  function recordLoop() {
+    if (rec) { if (rec.mr.state === 'recording') rec.mr.stop(); return; }
+    if (!window.MediaRecorder || !glCanvas.captureStream) return toast('THIS WINDOW CANNOT RECORD', true);
+    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+    const len = (Math.max(4, S.loopBars) * 240) / S.clockBpm, before = { structure: S.structure, quality: S.quality, fps: S.fps };
+    const chunks = [], mr = new MediaRecorder(glCanvas.captureStream(60), { mimeType: mime, videoBitsPerSecond: 30e6 });
+    mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    mr.onstop = () => {
+      rec = null; setS(before, false); setRecUi();
+      const url = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' })), a = document.createElement('a');
+      a.href = url; a.download = `HYPERSPACE-loop-${S.clockBpm}bpm-${S.loopBars}bars-${S.theme}.webm`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      toast(`LOOP SAVED · ${S.loopBars} BARS · ${len.toFixed(2)} s`);
+    };
+    setS({ structure: 'clock', quality: 'ultra', fps: 60 }, false);
+    ST.ct = 0; ST.phrase = -1; ST.vbeat = -1; rec = { mr, len };
+    setTimeout(() => { if (rec && mr.state === 'inactive') { ST.ct = 0; ST.phrase = -1; ST.vbeat = -1; mr.start(); } }, 300); // let the new resolution settle, then start on bar 1
+    setRecUi();
+  }
+  function setRecUi() {
+    const b = document.getElementById('vj-rec'), st = document.getElementById('vj-recstat');
+    if (!b) return;
+    b.textContent = rec ? '■ STOP' : '● RECORD LOOP';
+    if (st) st.textContent = rec ? 'starting…' : `${Math.max(4, S.loopBars)} bars at ${S.clockBpm} BPM = ${((Math.max(4, S.loopBars) * 240) / S.clockBpm).toFixed(2)} s, saved as WebM at ULTRA quality`;
+  }
+
   // ---------------- frame loop ----------------
   let rot = 0, lastT = 0, cur = 0, flash = 0, liteOn = false;
   if (WALL) { hs.on('lite', (s) => { liteOn = !!s?.on; }); hs.call('liteGet').then((s) => { liteOn = !!s?.on; }).catch(() => {}); }
   let looping = true;
   function frame(tms) {
-    const visible = (OUT && !wallPaused) || (window.HS && HS.view === 'vj');
+    const visible = (OUT && !wallPaused) || (window.HS && HS.inVJ());
     // the VJ tab in a HYPERSPACE window asks for no frames at all while another tab shows (HS.onView restarts it)
     if (!SPOUT) { if (visible || OUT) requestAnimationFrame(frame); else looping = false; }
     if (!visible) { lastT = 0; return; }
@@ -509,11 +600,16 @@
     // silence: let bands fall away
     if (performance.now() - A.last > 300) { A.bass *= 0.9; A.mid *= 0.9; A.treble *= 0.9; }
     A.beat *= Math.pow(0.02, dt);
+    structure(dt);
+    if (rec && rec.mr.state === 'recording') {
+      if (ST.ct >= rec.len) rec.mr.stop();
+      else { const st = document.getElementById('vj-recstat'); if (st) st.textContent = `recording ${ST.ct.toFixed(1)} / ${rec.len.toFixed(1)} s`; }
+    }
     if (S.flash && A.beat > 0.9) flash = 1;
     flash *= Math.pow(0.005, dt);
 
     // hardware ties
-    let spin = S.speed * (0.25 + A.mid * 0.9);
+    let spin = S.speed * (0.25 + A.mid * 0.9) * (1 + ST.build * 1.2);
     if (S.cpuSpin) spin *= 1 + HW.cpu * S.cpuSpinAmt * 2.5;
     const dir = S.dir === 'ccw' ? -1 : S.dir === 'pingpong' ? (Math.floor(A.beats / 16) % 2 ? -1 : 1) : 1;
     rot += spin * dt * dir;
@@ -531,8 +627,8 @@
     g2.save();
     g2.translate(gw / 2, gh / 2);
     g2.lineJoin = 'round';
-    const R = Math.min(gw, gh) * 0.46 * S.scale * (1 + A.beat * 0.04 * S.punch);
-    const fdata = { t, dt, rot, bass: A.bass, mid: A.mid, treble: A.treble, beat: A.beat, level: Math.min(1.5, A.level), complexity, spec: A.spec, fold: S.fold, tilt: S.tilt };
+    const R = Math.min(gw, gh) * 0.46 * S.scale * (1 + A.beat * 0.04 * S.punch + ST.drop * 0.1 * S.zoomPunch);
+    const fdata = { t, dt, rot, bass: A.bass, mid: A.mid, treble: A.treble, beat: A.beat, level: Math.min(1.5, A.level), complexity, spec: A.spec, fold: S.fold, tilt: S.tilt, build: ST.build, drop: ST.drop, beatPh: ST.beatPh };
     const main = THEMES[S.theme] || THEMES.flower;
     try { main.draw.call(main, g2, R, fdata); } catch (e) { console.error(e); }
     // stacked centre themes (shift-click): each turns its own way at its own size so they interlock
@@ -578,8 +674,8 @@
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texGeo); gl.uniform1i(progFeed.u.uGeo, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, src.tex); gl.uniform1i(progFeed.u.uPrev, 1);
     gl.uniform1f(progFeed.u.uAspect, aspect);
-    gl.uniform1f(progFeed.u.uZoom, S.zoom * (0.012 + A.bass * 0.03));
-    gl.uniform1f(progFeed.u.uRot, (spin * 0.004 + A.beat * 0.01) * (S.zoom > 0 ? 1 : 0));
+    gl.uniform1f(progFeed.u.uZoom, S.zoom * (0.012 + A.bass * 0.03) * (1 + ST.build * 1.2 + ST.drop * 2.2));
+    gl.uniform1f(progFeed.u.uRot, (spin * 0.004 + A.beat * 0.01 + ST.drop * 0.02) * (S.zoom > 0 ? 1 : 0));
     gl.uniform1f(progFeed.u.uDecay, S.trails);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     cur = 1 - cur;
@@ -591,7 +687,17 @@
     gl.uniform2f(progOut.u.uRes, W, Hh);
     gl.uniform1f(progOut.u.uAspect, aspect);
     gl.uniform1f(progOut.u.uTime, t);
-    gl.uniform1f(progOut.u.uK, S.kaleido);
+    // camera shake, zoom punch, mosh, bloom and the riser strobe all hang off the build/drop state
+    const bk = Math.min(1, A.bass), mag = S.shake * (0.009 * A.beat * bk + 0.026 * ST.drop + 0.003 * ST.build);
+    gl.uniform2f(progOut.u.uShake, (Math.sin(t * 71.3) + Math.sin(t * 43.1 + 2)) * 0.5 * mag, (Math.sin(t * 57.7 + 1) + Math.sin(t * 33.3 + 4)) * 0.5 * mag);
+    gl.uniform1f(progOut.u.uPunch, S.zoomPunch * (0.045 * A.beat * bk + 0.15 * ST.drop));
+    gl.uniform1f(progOut.u.uMosh, S.datamosh * (ST.drop + 0.22 * A.beat * bk + 0.3 * ST.build));
+    gl.uniform1f(progOut.u.uBloom, S.bloom * (1 + ST.drop * 1.6 + ST.build * 0.6));
+    gl.uniform1f(progOut.u.uBuild, ST.build);
+    gl.uniform1f(progOut.u.uInv, S.flash && ST.drop > 0.94 ? 0.55 : 0);
+    let kal = S.kaleido;
+    if (S.kaleidoFx) kal = ST.build > 0.55 ? (A.beats % 2 ? 12 : 8) : ST.drop > 0.25 ? 6 : S.kaleido; // strobing kaleidoscope on builds and drops
+    gl.uniform1f(progOut.u.uK, kal);
     gl.uniform1f(progOut.u.uChroma, chroma);
     gl.uniform1f(progOut.u.uGlow, glow);
     gl.uniform1f(progOut.u.uGlitch, glitch);
@@ -599,7 +705,8 @@
     gl.uniform1f(progOut.u.uHue, 0);
     gl.uniform1f(progOut.u.uSpout, SPOUT ? 1 : 0);
     gl.uniform1f(progOut.u.uMirror, S.mirror);
-    gl.uniform1f(progOut.u.uStrobe, S.strobe ? Math.max(0, A.beat - 0.55) * 2.2 : 0);
+    const riser = S.strobe && ST.build > 0.8 ? (((ST.beatPh * (2 + ST.build * 6)) % 1) < 0.5 ? 0.3 * (ST.build - 0.8) * 5 : 0) : 0;
+    gl.uniform1f(progOut.u.uStrobe, (S.strobe ? Math.max(0, A.beat - 0.55) * 2.2 : 0) + riser);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     if (SPOUT) spoutSend();
 
@@ -637,7 +744,7 @@
     };
     loop();
   } else requestAnimationFrame(frame);
-  if (window.HS && !OUT) HS.onView((v) => { if (v === 'vj' && !looping) { looping = true; requestAnimationFrame(frame); } });
+  const wakeVJ = () => { if (HS.inVJ() && !looping) { looping = true; requestAnimationFrame(frame); } }; if (window.HS && !OUT) { HS.onView(wakeVJ); window.addEventListener('hs-crate-section', wakeVJ); }
 
   function nextTheme() {
     const all = Object.keys(THEMES);
@@ -666,12 +773,12 @@
   // audio capture lease: the laptop only runs the FFT while something is showing it
   const leaseId = SPOUT ? 'spout' : WALL ? `wall-${QS.get('d') || 0}` : OUT ? 'vjout' : hs.remote ? `phone-${Math.random().toString(36).slice(2, 8)}` : 'main';
   function lease() {
-    const want = (OUT && !wallPaused) || (window.HS && (HS.view === 'vj' || S.reactUi));
+    const want = (OUT && !wallPaused) || (window.HS && (HS.inVJ() || S.reactUi));
     hs.call('audioLease', leaseId, !!want, S.source).catch(() => {});
   }
   if (WALL) hs.on('wallpaper-pause', (p) => { if (p.id === QS.get('d') && p.paused !== wallPaused) { wallPaused = p.paused; lease(); } });
   setInterval(lease, 5000);
-  if (window.HS) HS.onView(lease);
+  if (window.HS) { HS.onView(lease); window.addEventListener('hs-crate-section', lease); }
   lease();
 
   if (window.HS) HS.actions.vjNext = () => nextTheme();
@@ -680,6 +787,16 @@
     window.addEventListener('beforeunload', () => hs.call('audioLease', leaseId, false));
     return;
   }
+
+  // built-in loop looks (cyan / pink / purple and matrix green). Each one is a whole setting patch.
+  const LOOK_PACK = [
+    { name: 'NEON TUNNEL DROP', tip: 'Sacred-geometry tunnel, cyan/pink/purple, big camera punch on the drop', s: { theme: 'sactunnel', stack: [], layer2: 'none', backdrop: 'stars', palette: 'neon', structure: 'clock', clockBpm: 140, loopBars: 8, zoom: 0.55, trails: 0.9, glow: 0.9, chroma: 0.5, shake: 1, zoomPunch: 1, datamosh: 0.5, bloom: 0.9, kaleido: 0, kaleidoFx: false, mirror: 0, speed: 1.1 } },
+    { name: 'MATRIX VORTEX', tip: 'Green glyph rain spiralling into a vortex', s: { theme: 'matrixvortex', stack: [], layer2: 'none', backdrop: 'rain', palette: 'matrix', structure: 'clock', clockBpm: 128, loopBars: 8, zoom: 0.45, trails: 0.92, glow: 1, chroma: 0.35, shake: 0.7, zoomPunch: 0.8, datamosh: 0.35, bloom: 0.8, kaleido: 0, kaleidoFx: false, mirror: 0, speed: 0.9 } },
+    { name: 'STROBE MANDALA', tip: 'Kaleidoscope that flips segment counts on builds and drops', s: { theme: 'kaleidoburst', stack: [], layer2: 'none', backdrop: 'none', palette: 'neon', structure: 'clock', clockBpm: 150, loopBars: 8, zoom: 0.35, trails: 0.84, glow: 0.9, chroma: 0.45, shake: 0.8, zoomPunch: 0.9, datamosh: 0.3, bloom: 0.9, kaleido: 0, kaleidoFx: true, mirror: 0, speed: 1.2 } },
+    { name: 'GLITCH MERKABA', tip: 'Star tetrahedron split into RGB ghosts, torn slices and datamosh', s: { theme: 'glitchmerk', stack: [], layer2: 'none', backdrop: 'none', palette: 'subashton', structure: 'clock', clockBpm: 174, loopBars: 8, zoom: 0.4, trails: 0.86, glow: 0.8, chroma: 0.7, shake: 1.2, zoomPunch: 1, datamosh: 1, bloom: 0.6, kaleido: 0, kaleidoFx: false, mirror: 0, speed: 0.8 } },
+    { name: 'TUNNEL × VORTEX', tip: 'Both tunnels layered: the full hyperspace jump', s: { theme: 'sactunnel', stack: [], layer2: 'matrixvortex', layer2Mix: 0.7, layer2Scale: 0.9, backdrop: 'none', palette: 'neon', structure: 'clock', clockBpm: 140, loopBars: 16, zoom: 0.6, trails: 0.91, glow: 1, chroma: 0.55, shake: 1, zoomPunch: 1.1, datamosh: 0.6, bloom: 1, kaleido: 0, kaleidoFx: false, mirror: 0, speed: 1 } },
+    { name: 'MATRIX MERKABA', tip: 'Green sacred geometry with a kaleidoscope drop', s: { theme: 'merkaba', stack: ['sactunnel'], layer2: 'none', backdrop: 'rain', palette: 'matrix', structure: 'audio', zoom: 0.5, trails: 0.9, glow: 1.1, chroma: 0.4, shake: 0.7, zoomPunch: 0.8, datamosh: 0.4, bloom: 0.8, kaleido: 0, kaleidoFx: true, mirror: 0, speed: 1 } },
+  ];
 
   // ---------------- control panel ----------------
   const CONTROLS = [
@@ -690,6 +807,18 @@
     { k: 'auto', type: 'check', label: 'auto-cycle themes on the beat' },
     { k: 'autoMode', type: 'seg', label: 'CYCLE THROUGH', options: [['seq', 'IN ORDER'], ['random', 'RANDOM'], ['favs', '★ FAVOURITES']] },
     { k: 'autoBeats', type: 'range', label: 'BEATS PER THEME', min: 8, max: 128, step: 8 },
+    { h: 'LOOP LOOKS' }, { type: 'lookpack' },
+    { h: 'LOOP PRODUCTION' },
+    { k: 'structure', type: 'seg', label: 'BUILD / DROP', options: [['off', 'OFF'], ['audio', 'FROM THE MUSIC'], ['clock', 'BPM CLOCK (own drums)']] },
+    { k: 'clockBpm', type: 'range', label: 'LOOP BPM', min: 70, max: 180, step: 1 },
+    { k: 'loopBars', type: 'seg', label: 'LOOP LENGTH (BARS)', options: [[4, '4'], [8, '8'], [16, '16'], [32, '32']] },
+    { type: 'looprec' },
+    { k: 'shake', type: 'range', label: 'CAMERA SHAKE', min: 0, max: 2, step: 0.05 },
+    { k: 'zoomPunch', type: 'range', label: 'ZOOM PUNCH', min: 0, max: 2, step: 0.05 },
+    { k: 'datamosh', type: 'range', label: 'GLITCH / DATAMOSH', min: 0, max: 1.5, step: 0.05 },
+    { k: 'bloom', type: 'range', label: 'BLOOM', min: 0, max: 2, step: 0.05 },
+    { k: 'kaleidoFx', type: 'check', label: 'strobing kaleidoscope on builds and drops' },
+    { h: 'SHOW PRESETS' }, { type: 'showpresets' },
     { h: 'PRESETS' }, { type: 'presets' },
     { h: 'AUDIO' }, { k: 'source', type: 'source' },
     { k: 'sensitivity', type: 'range', label: 'SENSITIVITY', min: 0.2, max: 3, step: 0.05 },
@@ -749,12 +878,15 @@
     if (c.type === 'themes') return `<div class="dim tiny">shift-click to stack up to 4 more themes in the centre · right-click to ★ favourite</div>` + Object.entries(CATS).map(([cat, label]) =>
       `<div class="tcat">${label}</div><div class="theme-grid">${Object.entries(THEMES).filter(([, t]) => t.cat === cat).map(([k, t]) => `<button data-theme="${k}">${t.name}</button>`).join('')}</div>`).join('');
     if (c.type === 'palette') return `<div class="pal-grid">${Object.entries(PALETTES).map(([k, p]) => {
-      const sw = p.cycle ? 'linear-gradient(90deg,#f05,#fc0,#0f6,#0cf,#a0f)' : p.duo ? `linear-gradient(90deg,hsl(${p.duo[0]},100%,50%) 50%,hsl(${p.duo[1]},100%,55%) 50%)` : `hsl(${p.base},${p.sat ?? 100}%,${p.sat === 0 ? 85 : 50}%)`;
+      const sw = p.cycle ? 'linear-gradient(90deg,#f05,#fc0,#0f6,#0cf,#a0f)' : p.tri ? `linear-gradient(90deg,hsl(${p.tri[0]},100%,50%) 33%,hsl(${p.tri[1]},100%,55%) 33% 66%,hsl(${p.tri[2]},100%,60%) 66%)` : p.duo ? `linear-gradient(90deg,hsl(${p.duo[0]},100%,50%) 50%,hsl(${p.duo[1]},100%,55%) 50%)` : `hsl(${p.base},${p.sat ?? 100}%,${p.sat === 0 ? 85 : 50}%)`;
       return `<button data-pal="${k}"><i style="background:${sw}"></i>${p.label}</button>`;
     }).join('')}</div>`;
     if (c.type === 'layer2') return `<label>LAYER 2 <em class="dim">a second theme blended over the first</em></label><select id="vj-layer2"><option value="none">— none —</option>${Object.entries(CATS).map(([cat, label]) =>
       `<optgroup label="${label}">${Object.entries(THEMES).filter(([, t]) => t.cat === cat).map(([k, t]) => `<option value="${k}">${t.name}</option>`).join('')}</optgroup>`).join('')}</select>`;
     if (c.type === 'images') return '<div class="dim tiny">black backgrounds disappear, so logos on black blend in perfectly</div><div class="img-grid" id="vj-imgs"></div>';
+    if (c.type === 'showpresets') return `<div class="preset-row"><input id="vj-spname" class="rt-input" placeholder="name this show…" spellcheck="false" /><button class="act" id="vj-spsave" title="Save the whole theme stack and every setting">SAVE</button></div><div id="vj-splist" class="vj-plist"></div><div class="dim tiny">click or press 1-9 to recall · right-click to rename or delete</div>`;
+    if (c.type === 'lookpack') return `<div class="vj-plist">${LOOK_PACK.map((l, i) => `<button class="vj-pchip" data-lpack="${i}" title="${esc(l.tip)}">${esc(l.name)}</button>`).join('')}</div><div class="dim tiny">one-click loop looks: they set the theme, colours, camera punch and build/drop for you</div>`;
+    if (c.type === 'looprec') return `<div class="preset-row"><button class="act" id="vj-rec" title="Plays the BPM clock from bar 1 and saves exactly this many bars as a WebM video (ULTRA quality, 60 fps)">● RECORD LOOP</button></div><div class="dim tiny" id="vj-recstat"></div>`;
     if (c.type === 'presets') return `<div class="preset-row"><input id="vj-pname" class="rt-input" placeholder="name this look…" spellcheck="false" /><button class="act" id="vj-psave">SAVE</button><button class="act" id="vj-random" title="Roll a random look">🎲 RANDOM</button></div><div id="vj-plist" class="vj-plist"></div>`;
     if (c.type === 'wallpaper') return `<div class="sp-top"><label class="switch" title="Put the visualizer behind your desktop icons"><input type="checkbox" id="wp-on" /><span></span></label><div id="wp-status" class="sp-status">off</div></div>
       <div id="wp-displays" class="wp-displays"></div>
@@ -800,6 +932,7 @@
     const k = e.target.dataset.k;
     if (!k) return;
     setS({ [k]: e.target.type === 'checkbox' ? e.target.checked : Number(e.target.value) });
+    if (k === 'clockBpm') setRecUi();
   });
   box.addEventListener('click', (e) => {
     const th = e.target.closest('[data-theme]');
@@ -815,12 +948,15 @@
     const pal = e.target.closest('[data-pal]');
     if (pal) return setS({ palette: pal.dataset.pal });
     const sg = e.target.closest('[data-seg] button');
-    if (sg) { const v = sg.dataset.v; return setS({ [sg.parentElement.dataset.seg]: isNaN(Number(v)) ? v : Number(v) }); }
+    if (sg) { const v = sg.dataset.v; setS({ [sg.parentElement.dataset.seg]: isNaN(Number(v)) ? v : Number(v) }); if (sg.parentElement.dataset.seg === 'loopBars') setRecUi(); return; }
     if (e.target.id === 'vj-reset' && confirm('Reset every VJ slider? Saved presets stay.')) { setS({ ...DEFAULTS, favs: S.favs || [] }); toast('VJ SETTINGS RESET'); }
     if (e.target.id === 'vj-send') hs.call('vjOut', Number(document.getElementById('vj-display').value)).then(() => toast('VJ OUTPUT OPEN · ESC CLOSES IT')).catch((er) => toast(er.message, true));
     if (e.target.id === 'vj-close') hs.call('vjOut', null).catch(() => {});
     if (e.target.id === 'vj-random') randomLook();
     if (e.target.id === 'vj-psave') savePreset();
+    if (e.target.id === 'vj-rec') recordLoop();
+    const lp = e.target.closest('[data-lpack]');
+    if (lp) { const l = LOOK_PACK[+lp.dataset.lpack]; setS({ ...l.s }); toast(`LOOK · ${l.name}`); setRecUi(); }
     const pb = e.target.closest('[data-preset]');
     if (pb) {
       const list = HS.config.vjPresets || [];
@@ -896,6 +1032,70 @@
   HS.actions.vjRandom = randomLook;
   hs.on('config', () => renderPresets());
   renderPresets();
+
+  // ---------------- show presets: the whole theme stack + every parameter, recalled with one click or keys 1-9 ----------------
+  const SP_KEY = 'hs-vj-presets', SP_SKIP = ['source', 'quality', 'fps', 'favs'];
+  let spRename = -1;
+  const spLoad = () => { try { const l = JSON.parse(localStorage.getItem(SP_KEY) || '[]'); return Array.isArray(l) ? l.filter((p) => p && p.name && p.s) : []; } catch { return []; } };
+  const spStore = (l) => { try { localStorage.setItem(SP_KEY, JSON.stringify(l)); } catch {} renderShowPresets(); };
+  function renderShowPresets() {
+    const box = document.getElementById('vj-splist');
+    if (!box) return;
+    const l = spLoad();
+    box.innerHTML = l.length ? l.map((p, i) => spRename === i
+      ? `<input class="rt-input vj-sprn" data-i="${i}" value="${esc(p.name)}" spellcheck="false" />`
+      : `<button class="vj-pchip" data-sp="${i}" title="${esc([p.s.theme, ...(p.s.stack || [])].map(themeName).join(' + '))}">${i < 9 ? `<b>${i + 1}</b>` : ''}${esc(p.name)}</button>`).join('')
+      : '<span class="dim tiny">no saved shows yet</span>';
+    const rn = box.querySelector('.vj-sprn'); if (rn) { rn.focus(); rn.select(); }
+  }
+  function recallShow(i) {
+    const p = spLoad()[i];
+    if (!p) return;
+    setS({ ...p.s });
+    toast(`SHOW · ${p.name.toUpperCase()}`);
+  }
+  HS.actions.vjRecall = recallShow;
+  document.getElementById('vj-controls').addEventListener('click', (e) => {
+    if (e.target.id === 'vj-spsave') {
+      const inp = document.getElementById('vj-spname');
+      const name = inp.value.trim() || `${themeName(S.theme)}${(S.stack || []).length ? ' +' + S.stack.length : ''} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      const s = Object.fromEntries(Object.entries(S).filter(([k]) => !SP_SKIP.includes(k)));
+      spStore([...spLoad().filter((p) => p.name !== name), { name, s }]);
+      inp.value = ''; toast(`SHOW SAVED · ${name.toUpperCase()}`);
+      return;
+    }
+    const c = e.target.closest('[data-sp]');
+    if (c) recallShow(+c.dataset.sp);
+  });
+  document.getElementById('vj-controls').addEventListener('contextmenu', (e) => {
+    const c = e.target.closest('[data-sp]');
+    if (!c || !window.hsMenu) return;
+    e.preventDefault();
+    const i = +c.dataset.sp, p = spLoad()[i];
+    window.hsMenu(e, [
+      { label: 'Recall', run: () => recallShow(i) },
+      { label: 'Rename', run: () => { spRename = i; renderShowPresets(); } },
+      { label: 'Overwrite with the current look', run: () => { const l = spLoad(); l[i] = { name: p.name, s: Object.fromEntries(Object.entries(S).filter(([k]) => !SP_SKIP.includes(k))) }; spStore(l); toast('SHOW UPDATED'); } },
+      '-',
+      { label: 'Delete', danger: true, run: () => spStore(spLoad().filter((_, k) => k !== i)) },
+    ], p.name);
+  });
+  const spCommit = (inp, ok) => {
+    const l = spLoad(), i = +inp.dataset.i, nm = inp.value.trim();
+    spRename = -1;
+    if (ok && nm && l[i]) { l[i].name = nm; spStore(l); } else renderShowPresets();
+  };
+  document.getElementById('vj-controls').addEventListener('keydown', (e) => {
+    if (!e.target.classList?.contains('vj-sprn')) return;
+    e.stopPropagation();
+    if (e.key === 'Enter') spCommit(e.target, true); else if (e.key === 'Escape') spCommit(e.target, false);
+  });
+  document.getElementById('vj-controls').addEventListener('focusout', (e) => { if (e.target.classList?.contains('vj-sprn') && spRename >= 0) spCommit(e.target, true); });
+  window.addEventListener('keydown', (e) => {
+    if (!HS.inVJ() || e.ctrlKey || e.altKey || e.metaKey || !/^[1-9]$/.test(e.key) || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
+    recallShow(+e.key - 1);
+  });
+  renderShowPresets();
 
   // ---------------- live wallpaper ----------------
   let wp = null;
@@ -974,17 +1174,18 @@
       document.getElementById('vj-display').innerHTML = '<option>only on the laptop</option>';
     }
   }
-  HS.onView((v) => { if (v === 'vj') loadSources(); });
-  hs.on('core', (s) => { if (s.state === 'online' && HS.view === 'vj') loadSources(); });
+  HS.onView(() => { if (HS.inVJ()) loadSources(); }); window.addEventListener('hs-crate-section', () => { if (HS.inVJ()) loadSources(); });
+  hs.on('core', (s) => { if (s.state === 'online' && HS.inVJ()) loadSources(); });
 
   document.getElementById('vj-fs').addEventListener('click', () => {
     if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen().catch(() => {});
   });
   window.addEventListener('keydown', (e) => {
-    if (HS.view !== 'vj' || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (!HS.inVJ() || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
     if (e.key === 'f' || e.key === 'F') document.getElementById('vj-fs').click();
     if (e.key === ' ') { e.preventDefault(); nextTheme(); }
   });
+  setRecUi();
   hs.on('audio', () => {
     const src = document.getElementById('vj-src');
     if (src) src.textContent = A.silent ? 'silence…' : `beats ${A.beats}`;

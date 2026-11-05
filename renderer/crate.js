@@ -119,6 +119,7 @@
       const open = openFolders.has(p.id) || shown.has(p.id);
       return `<button class="cr-folder${open ? ' open' : ''}" data-fid="${esc(p.id)}" style="--d:${depth}"><span>${open ? '▾' : '▸'} ${esc(p.name)}</span><em>${(kids.get(p.id) || []).length}</em></button>${open ? tree(p.id, depth + 1) : ''}`;
     }).join('');
+    h += smartNavHtml(item);
     if (L.playlists?.length) h += `<div class="cr-sec">PLAYLISTS</div>${tree('root', 0)}`;
     if (L.history?.length) h += '<div class="cr-sec">REKORDBOX HISTORY</div>' + L.history.slice(0, 12).map((x) => item('hist', `◴ ${esc(x.name || x.date)}`, x.tracks.length, `data-id="${esc(x.id)}"`)).join('');
     h += `<div class="cr-sec">FOLDERS <button class="chip mini" id="cr-addfolder" title="Add a folder of music that isn't in rekordbox">+ ADD</button></div>` +
@@ -148,6 +149,200 @@
     if (b) setView({ kind: b.dataset.kind, id: b.dataset.id || null });
   });
 
+  // ---------------- SMART PLAYLISTS: rule-based lists that re-run every time you open them ----------------
+  // saved in localStorage 'hs-crate-smart' as [{ id, name, root:{op,items}, sort:{k,dir}, limit }]; a rule is { f, o, v }
+  const SF = {
+    bpm: { l: 'BPM', ops: [['between', 'between', 'range'], ['gte', 'at least', 'num'], ['lte', 'at most', 'num'], ['near', 'within ±3 of', 'num']] },
+    key: { l: 'KEY', ops: [['compat', 'compatible with (Camelot)', 'key'], ['same', 'same key as', 'key'], ['pm1', '±1 on the wheel of', 'key'], ['now', 'compatible with NOW PLAYING', 'none']] },
+    energy: { l: 'ENERGY %', ops: [['gte', 'at least', 'num'], ['lte', 'at most', 'num'], ['between', 'between', 'range']] },
+    genre: { l: 'GENRE / TAGS', ops: [['has', 'contains', 'text'], ['hasnot', 'does not contain', 'text']] },
+    artist: { l: 'ARTIST', ops: [['has', 'contains', 'text'], ['hasnot', 'does not contain', 'text']] },
+    title: { l: 'TITLE', ops: [['has', 'contains', 'text'], ['hasnot', 'does not contain', 'text']] },
+    year: { l: 'RELEASE YEAR', ops: [['between', 'between', 'range'], ['gte', 'from', 'num'], ['lte', 'up to', 'num']] },
+    added: { l: 'DATE ADDED', ops: [['within', 'in the last (days)', 'num'], ['older', 'more than (days) ago', 'num']] },
+    rating: { l: 'RATING ★', ops: [['gte', 'at least', 'num'], ['lte', 'at most', 'num'], ['is', 'exactly', 'num']] },
+    plays: { l: 'PLAYED', ops: [['never', 'never', 'none'], ['ever', 'at least once', 'none'], ['gte', 'at least (times)', 'num'], ['lte', 'at most (times)', 'num']] },
+  };
+  const SORTS = { added: 'DATE ADDED', bpm: 'BPM', key: 'KEY', rating: 'RATING', plays: 'PLAYED', title: 'TITLE', artist: 'ARTIST', energy: 'ENERGY', random: 'RANDOM' };
+  const grp = (op, items) => ({ op, items });
+  const rl = (f, o, v) => ({ f, o, v });
+  const SMART_DEFAULTS = () => [
+    { id: 'sm-warm', name: 'WARM-UP 100-118 BPM', root: grp('and', [rl('bpm', 'between', [100, 118])]), sort: { k: 'bpm', dir: 1 }, limit: 0 },
+    { id: 'sm-peak', name: 'PEAK 124-132 BPM', root: grp('and', [rl('bpm', 'between', [124, 132])]), sort: { k: 'bpm', dir: 1 }, limit: 0 },
+    { id: 'sm-key', name: 'KEY MATCH TO NOW PLAYING', root: grp('and', [rl('key', 'now', null)]), sort: { k: 'bpm', dir: 1 }, limit: 0 },
+    { id: 'sm-new', name: 'RECENTLY ADDED', root: grp('and', [rl('added', 'within', 30)]), sort: { k: 'added', dir: -1 }, limit: 50 },
+    { id: 'sm-never', name: 'NEVER PLAYED', root: grp('and', [rl('plays', 'never', null)]), sort: { k: 'added', dir: -1 }, limit: 0 },
+  ];
+  let smart = null;
+  try { smart = JSON.parse(localStorage.getItem('hs-crate-smart')); } catch {}
+  if (!Array.isArray(smart)) smart = SMART_DEFAULTS();
+  const saveSmart = () => { try { localStorage.setItem('hs-crate-smart', JSON.stringify(smart)); } catch {} };
+  saveSmart();
+  const smartUsesNow = (n) => (n.items ? n.items.some(smartUsesNow) : n.f === 'key' && n.o === 'now');
+  const yearOf = (t) => { const y = parseInt(String(t.sc?.released || '').slice(0, 4), 10); return y > 1900 ? y : null; };
+  const num = (x) => (x === '' || x == null || isNaN(+x) ? null : +x);
+  function smartRule(r, t, ctx) {
+    const v = r.v;
+    const lo = num(Array.isArray(v) ? v[0] : v), hi = num(Array.isArray(v) ? v[1] : null);
+    switch (r.f) {
+      case 'bpm': { const b = t.bpm; if (!b) return false;
+        if (r.o === 'between') return (lo == null || b >= lo) && (hi == null || b <= hi);
+        if (lo == null) return true;
+        return r.o === 'gte' ? b >= lo : r.o === 'lte' ? b <= lo : Math.abs(b - lo) <= 3; }
+      case 'key': { const mine = camelot(t.key), want = r.o === 'now' ? ctx.cam : camelot(String(v || ''));
+        if (!mine || !want) return false;
+        const k = keyDist(mine, want);
+        return r.o === 'same' ? k.d === 0 && !k.rel : r.o === 'pm1' ? k.d <= 1 && !k.rel : (k.d === 0) || (k.d === 1 && !k.rel); }
+      case 'energy': { const e = C.feats[t.id]?.e; if (e == null) return false;
+        return r.o === 'between' ? (lo == null || e >= lo) && (hi == null || e <= hi) : lo == null ? true : r.o === 'gte' ? e >= lo : e <= lo; }
+      case 'genre': case 'artist': case 'title': {
+        const q = String(v || '').toLowerCase().trim(); if (!q) return true; const n = names(t);
+        const hay = (r.f === 'genre' ? `${t.genre || ''} ${t.sc?.genre || ''} ${(t.sc?.tags || []).join(' ')}` : r.f === 'artist' ? `${n.artist} ${t.artist || ''}` : `${n.title} ${t.title || ''}`).toLowerCase();
+        return hay.includes(q) === (r.o === 'has'); }
+      case 'year': { const y = yearOf(t); if (y == null) return false;
+        return r.o === 'between' ? (lo == null || y >= lo) && (hi == null || y <= hi) : lo == null ? true : r.o === 'gte' ? y >= lo : y <= lo; }
+      case 'added': { const d = Date.parse(t.added); if (isNaN(d) || lo == null) return false; const age = (Date.now() - d) / 864e5; return r.o === 'within' ? age <= lo : age > lo; }
+      case 'rating': { const g = t.rating || 0; return lo == null ? true : r.o === 'gte' ? g >= lo : r.o === 'lte' ? g <= lo : g === lo; }
+      case 'plays': { const p = plays(t); return r.o === 'never' ? p === 0 : r.o === 'ever' ? p > 0 : lo == null ? true : r.o === 'gte' ? p >= lo : p <= lo; }
+    }
+    return true;
+  }
+  function smartNode(n, t, ctx) {
+    if (!n.items) return smartRule(n, t, ctx);
+    if (!n.items.length) return true;
+    return n.op === 'or' ? n.items.some((x) => smartNode(x, t, ctx)) : n.items.every((x) => smartNode(x, t, ctx));
+  }
+  function smartRun(sp) {
+    const nowT = C.cur || (C.sel && C.byId.get(C.sel)) || null;
+    const ctx = { cam: nowT ? camelot(nowT.key) : null };
+    const useNow = smartUsesNow(sp.root);
+    let list = (C.lib?.tracks || []).filter((t) => t.exists && !(useNow && nowT && t.id === nowT.id) && smartNode(sp.root, t, ctx));
+    const k = sp.sort?.k || 'added', dir = sp.sort?.dir || 1;
+    if (k === 'random') list = list.map((t) => [Math.random(), t]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    else {
+      const val = (t) => (k === 'title' ? names(t).title.toLowerCase() : k === 'artist' ? names(t).artist.toLowerCase() : k === 'key' ? (camelot(t.key) || 'zz').padStart(3, '0')
+        : k === 'plays' ? plays(t) : k === 'energy' ? C.feats[t.id]?.e ?? -1 : k === 'added' ? String(t.added || '') : t[k] ?? 0);
+      list = list.sort((x, y) => { const a = val(x), b = val(y); return (a < b ? -1 : a > b ? 1 : 0) * dir; });
+    }
+    return sp.limit > 0 ? list.slice(0, sp.limit) : list;
+  }
+  const smartBy = (id) => smart.find((s) => s.id === id);
+  // sidebar section
+  function smartNavHtml(item) {
+    return `<div class="cr-sec">SMART PLAYLISTS <button class="chip mini" id="cr-sm-new" title="Build a playlist from rules; it re-fills itself">+ NEW</button></div>` +
+      smart.map((s) => item('smart', `⚡ ${esc(s.name)}`, smartRun(s).length, `data-id="${esc(s.id)}"`)).join('');
+  }
+  function smartMenu(e, s) {
+    window.hsMenu?.(e, [
+      { label: '▶ Play', run: () => { const l = smartRun(s); if (l.length) playFrom(l, 0); else toast('NOTHING MATCHES YET', true); } },
+      { label: 'Edit rules…', run: () => smartEdit(s.id) },
+      { label: 'Rename…', run: () => smartEdit(s.id, true) },
+      { label: 'Duplicate', run: () => { const c = JSON.parse(JSON.stringify(s)); c.id = `sm-${Date.now().toString(36)}`; c.name = `${s.name} COPY`; smart.splice(smart.indexOf(s) + 1, 0, c); saveSmart(); renderNav(); } },
+      '-',
+      { label: 'Delete', danger: true, run: () => {
+        if (!confirm(`Delete the smart playlist "${s.name}"? (Your tracks are not touched.)`)) return;
+        smart = smart.filter((x) => x !== s); saveSmart(); if (C.view.kind === 'smart' && C.view.id === s.id) C.view = { kind: 'all' }; renderNav(); setView(C.view); } },
+    ], s.name);
+  }
+  $('#cr-nav').addEventListener('contextmenu', (e) => { const b = e.target.closest('.cr-item[data-kind="smart"]'); if (b) { const s = smartBy(b.dataset.id); if (s) smartMenu(e, s); } });
+  $('#cr-nav').addEventListener('click', (e) => { if (e.target.id === 'cr-sm-new') smartEdit(null); });
+  // the current track changed: lists that follow it re-run
+  function smartOnTrack() {
+    if (!smart.some((s) => smartUsesNow(s.root))) return;
+    if (C.lib) { const sc = $('#cr-nav').scrollTop; renderNav(); $('#cr-nav').scrollTop = sc; }
+    if (C.view.kind === 'smart' && smartUsesNow(smartBy(C.view.id)?.root || { items: [] })) setView(C.view, true);
+  }
+  // editor
+  let sd = null; // { id, draft }
+  const smartAt = (path) => path.reduce((n, i) => n.items[i], sd.draft.root);
+  const pth = (s) => (s === '' || s == null ? [] : String(s).split(',').map(Number));
+  function smartEdit(id, focusName = false) {
+    const src = id ? smartBy(id) : null;
+    const draft = src ? JSON.parse(JSON.stringify(src)) : { id: `sm-${Date.now().toString(36)}`, name: 'NEW SMART PLAYLIST', root: grp('and', [rl('bpm', 'between', [120, 130])]), sort: { k: 'added', dir: -1 }, limit: 0 };
+    sd = { id: src ? src.id : null, draft };
+    let m = $('#cr-smart');
+    if (!m) { m = document.createElement('div'); m.id = 'cr-smart'; m.className = 'cr-smart-modal'; $('#view-crate').appendChild(m); wireSmart(m); }
+    m.classList.remove('hidden');
+    paintSmart();
+    const nm = $('#sm-name'); if (nm && focusName) { nm.focus(); nm.select(); }
+  }
+  const optsHtml = (pairs, cur) => pairs.map(([v, l]) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`).join('');
+  const KEYS = Array.from({ length: 12 }, (_, i) => [`${i + 1}A`, `${i + 1}B`]).flat();
+  function ruleHtml(r, p) {
+    const F = SF[r.f] || SF.bpm, op = F.ops.find((o) => o[0] === r.o) || F.ops[0], kind = op[2];
+    const a = Array.isArray(r.v) ? r.v : [r.v, null];
+    let val = '';
+    if (kind === 'range') val = `<input class="sm-v" data-role="v0" type="number" value="${a[0] ?? ''}" placeholder="from"><span class="dim">to</span><input class="sm-v" data-role="v1" type="number" value="${a[1] ?? ''}" placeholder="to">`;
+    else if (kind === 'num') val = `<input class="sm-v" data-role="v0" type="number" value="${Array.isArray(r.v) ? '' : r.v ?? ''}">`;
+    else if (kind === 'text') val = `<input class="sm-v wide" data-role="v0" type="text" value="${esc(r.v ?? '')}" placeholder="text">`;
+    else if (kind === 'key') val = `<select class="sm-v" data-role="v0">${optsHtml(KEYS.map((k) => [k, k]), r.v || '8A')}</select>`;
+    return `<div class="sm-r" data-p="${p}"><select data-role="f">${optsHtml(Object.entries(SF).map(([k, f]) => [k, f.l]), r.f)}</select>
+      <select data-role="o">${optsHtml(F.ops.map((o) => [o[0], o[1]]), op[0])}</select>${val}<button class="sm-x" data-act="del" title="Remove this rule">✕</button></div>`;
+  }
+  function groupHtml(g, p, depth) {
+    return `<div class="sm-g d${depth}" data-p="${p}"><div class="sm-gh">MATCH <select data-role="gop"><option value="and"${g.op === 'and' ? ' selected' : ''}>ALL (AND)</option><option value="or"${g.op === 'or' ? ' selected' : ''}>ANY (OR)</option></select> OF
+      <button class="chip mini" data-act="addr">+ RULE</button>${depth < 2 ? '<button class="chip mini" data-act="addg">+ GROUP</button>' : ''}${depth ? '<button class="sm-x" data-act="del" title="Remove this group">✕</button>' : ''}</div>
+      ${g.items.map((n, i) => { const q = p === '' ? String(i) : `${p},${i}`; return n.items ? groupHtml(n, q, depth + 1) : ruleHtml(n, q); }).join('') || '<div class="dim tiny cr-pad">no rules: matches every track</div>'}</div>`;
+  }
+  function paintSmart() {
+    const d = sd.draft, m = $('#cr-smart');
+    m.innerHTML = `<div class="cr-smart"><div class="cr-sm-head"><b>⚡ SMART PLAYLIST</b><input id="sm-name" type="text" maxlength="60" value="${esc(d.name)}"><span class="sm-count" id="sm-count"></span></div>
+      <div class="sm-body">${groupHtml(d.root, '', 0)}</div>
+      <div class="sm-foot"><label>SORT <select id="sm-sort">${optsHtml(Object.entries(SORTS), d.sort.k)}</select></label>
+        <button class="chip mini" id="sm-dir" title="Flip the order">${d.sort.dir < 0 ? '▼ HIGH → LOW' : '▲ LOW → HIGH'}</button>
+        <label>LIMIT <input id="sm-limit" type="number" min="0" value="${d.limit || ''}" placeholder="all" title="Keep only the first N, e.g. 50 for a top 50"></label>
+        <span class="sm-sp"></span><button class="chip" id="sm-cancel">CANCEL</button><button class="chip on" id="sm-save">SAVE</button></div>
+      <div class="dim tiny sm-note">NOW PLAYING rules use the selected track until something plays · ENERGY rules need the drop scan to have finished</div></div>`;
+    smartCount();
+  }
+  function smartCount() {
+    const n = smartRun(sd.draft).length, el = $('#sm-count');
+    if (el) el.textContent = `${n} TRACK${n === 1 ? '' : 'S'} MATCH`;
+  }
+  function wireSmart(m) {
+    m.addEventListener('mousedown', (e) => { if (e.target === m) m.classList.add('hidden'); });
+    m.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b || !sd) return;
+      if (b.id === 'sm-cancel') return m.classList.add('hidden');
+      if (b.id === 'sm-dir') { sd.draft.sort.dir *= -1; return paintSmart(); }
+      if (b.id === 'sm-save') {
+        const d = sd.draft; d.name = (d.name || '').trim() || 'SMART PLAYLIST';
+        const i = smart.findIndex((s) => s.id === sd.id);
+        if (i >= 0) smart[i] = d; else smart.push(d);
+        saveSmart(); m.classList.add('hidden'); renderNav(); setView({ kind: 'smart', id: d.id }); return;
+      }
+      const act = b.dataset.act; if (!act) return;
+      const p = pth(b.closest('[data-p]').dataset.p);
+      if (act === 'addr') smartAt(p).items.push(rl('bpm', 'between', [120, 130]));
+      else if (act === 'addg') smartAt(p).items.push(grp('and', [rl('genre', 'has', '')]));
+      else if (act === 'del') smartAt(p.slice(0, -1)).items.splice(p[p.length - 1], 1);
+      paintSmart();
+    });
+    m.addEventListener('input', (e) => {
+      if (!sd) return; const t = e.target, role = t.dataset.role;
+      if (t.id === 'sm-name') sd.draft.name = t.value;
+      else if (t.id === 'sm-limit') sd.draft.limit = Math.max(0, parseInt(t.value, 10) || 0);
+      else if (role === 'v0' || role === 'v1') {
+        const r = smartAt(pth(t.closest('[data-p]').dataset.p)), kind = SF[r.f].ops.find((o) => o[0] === r.o)[2];
+        if (kind === 'range') { const a = Array.isArray(r.v) ? r.v : [null, null]; a[role === 'v0' ? 0 : 1] = t.value === '' ? null : +t.value; r.v = a; }
+        else r.v = kind === 'num' ? (t.value === '' ? null : +t.value) : t.value;
+      } else return;
+      smartCount();
+    });
+    m.addEventListener('change', (e) => {
+      if (!sd) return; const t = e.target, role = t.dataset.role;
+      if (t.id === 'sm-sort') { sd.draft.sort.k = t.value; return smartCount(); }
+      if (role === 'gop') { smartAt(pth(t.closest('[data-p]').dataset.p)).op = t.value; return smartCount(); }
+      if (role === 'v0' && t.tagName === 'SELECT') { smartAt(pth(t.closest('[data-p]').dataset.p)).v = t.value; return smartCount(); }
+      if (role !== 'f' && role !== 'o') return;
+      const r = smartAt(pth(t.closest('[data-p]').dataset.p));
+      if (role === 'f') { r.f = t.value; r.o = SF[r.f].ops[0][0]; } else r.o = t.value;
+      const kind = SF[r.f].ops.find((o) => o[0] === r.o)[2];
+      r.v = kind === 'range' ? [null, null] : kind === 'key' ? '8A' : kind === 'text' ? '' : kind === 'none' ? null : r.f === 'added' ? 30 : r.f === 'rating' ? 3 : r.f === 'plays' ? 1 : r.f === 'energy' ? 60 : r.f === 'year' ? 2020 : 120;
+      paintSmart();
+    });
+  }
+
   // ---------------- views ----------------
   // NEW MUSIC: everything that reached your library in the last 30 days, newest first (▶ plays it like a radio)
   function newList() {
@@ -159,6 +354,7 @@
     switch (v.kind) {
       case 'new': return { title: 'NEW MUSIC', kicker: 'ADDED IN THE LAST 30 DAYS · PRESS ▶ TO PLAY THEM ALL', list: newList(), ordered: true };
       case 'pl': { const p = C.lib.playlists.find((x) => x.id === v.id); return { title: p?.name || 'PLAYLIST', kicker: 'REKORDBOX PLAYLIST', list: by(p?.tracks || []), ordered: true }; }
+      case 'smart': { const s = smartBy(v.id); return s ? { title: s.name, kicker: smartUsesNow(s.root) ? "SMART PLAYLIST · FOLLOWS WHAT'S PLAYING" : 'SMART PLAYLIST · FILLS ITSELF FROM YOUR RULES · RIGHT-CLICK IT TO EDIT', list: smartRun(s), ordered: true } : { title: 'ALL TRACKS', kicker: 'LIBRARY', list: [...T] }; }
       case 'hist': { const p = C.lib.history.find((x) => x.id === v.id); return { title: p?.name || 'HISTORY', kicker: 'REKORDBOX HISTORY', list: by(p?.tracks || []), ordered: true }; }
       case 'added': return { title: 'RECENTLY ADDED', kicker: 'LIBRARY', list: [...T].sort((a, b) => String(b.added).localeCompare(String(a.added))).slice(0, 250) };
       case 'newest': return { title: 'NEWEST RELEASES', kicker: 'BY SOUNDCLOUD RELEASE DATE', list: T.filter(released).sort((a, b) => String(released(b)).localeCompare(String(released(a)))).slice(0, 250) };
@@ -290,7 +486,11 @@
   $('#cr-clean').addEventListener('click', () => { C.clean = !C.clean; savePrefs(); syncTools(); renderRows(true); renderPlayer(); renderSide(); });
   $('#cr-refresh').addEventListener('click', () => load(true));
   $('#cr-settings').addEventListener('click', () => HS.actions.openSettings?.('crate'));
-  $('#cr-playall').addEventListener('click', () => { if (C.list.length) playFrom(C.list, 0); });
+  // the big play button follows the real state: pause while playing, resume (same spot) while paused, start the list only when nothing is loaded
+  $('#cr-playall').addEventListener('click', () => {
+    if (C.cur && !(au().paused && !C.list.some((x) => x.id === C.cur.id) && !C.queue.includes(C.cur.id))) { toggle(); return; }
+    if (C.list.length) playFrom(C.list, 0);
+  });
   $('#cr-shuffleall').addEventListener('click', () => { if (!C.list.length) return; C.shuffle = true; savePrefs(); playFrom(C.list, (Math.random() * C.list.length) | 0); });
   function syncTools() {
     $$('#cr-keyfmt button').forEach((b) => b.classList.toggle('on', b.dataset.v === C.keyFmt));
@@ -311,6 +511,7 @@
     renderRows(true);
     if (m === 'dj') { cancelMix(true); window.CrateDJ?.show(); }
     try { localStorage.setItem('crateMode', m); } catch {}
+    window.dispatchEvent(new Event('hs-crate-mode'));
   }
   $('#cr-modes').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) setMode(b.dataset.mode); });
 
@@ -344,7 +545,7 @@
     afterStart(t);
   }
   function afterStart(t) {
-    renderPlayer(); renderRows(true); renderQueue(); renderMix(); renderSide();
+    renderPlayer(); renderRows(true); renderQueue(); renderMix(); renderSide(); smartOnTrack();
     loadWave(C.deck, t);
     hs.call('libPlayed', t.id).then(() => { C.state.plays = { ...(C.state.plays || {}), [t.id]: ((C.state.plays || {})[t.id] || 0) + 1 }; C.state.recent = [t.id, ...(C.state.recent || []).filter((x) => x !== t.id)]; }).catch(() => {});
     mediaSession(t);
@@ -364,12 +565,13 @@
   function toggle() {
     if (!C.cur) { if (C.list.length) playFrom(C.list, 0); return; }
     E.resume();
-    if (au().paused) { au().play(); if (C.mix) E.other(C.deck).el.play(); } else { au().pause(); if (C.mix) E.other(C.deck).el.pause(); }
+    if (au().paused) { au().play(); if (C.mix?.phase === 'running') E.other(C.deck).el.play(); } else { au().pause(); if (C.mix?.phase === 'running') E.other(C.deck).el.pause(); }
   }
   for (const d of E.decks) {
     d.el.addEventListener('ended', () => { if (C.mode === 'player' && d === C.deck && !C.mix) next(true); });
     d.el.addEventListener('play', () => { if (d === C.deck) renderPlayer(); });
     d.el.addEventListener('pause', () => { if (d === C.deck) renderPlayer(); });
+    d.el.addEventListener('ended', () => { if (d === C.deck) renderPlayer(); });
     d.el.addEventListener('loadedmetadata', () => { if (d === C.deck && C.cur && !C.cur.len) C.cur.len = Math.round(d.el.duration); if (d === C.deck) renderPlayer(); });
     d.el.addEventListener('error', () => { if (d === C.deck && C.cur && d.el.src) toast(`CAN'T PLAY ${names(C.cur).title.toUpperCase()} · FORMAT NOT SUPPORTED`, true); });
   }
@@ -420,58 +622,144 @@
   HS.actions.crateToggle = toggle;
   HS.actions.crateNext = () => next();
 
-  // ---------------- transitions: the next track takes over with a crossfade ----------------
-  // At (end of the music − T seconds), snapped to a downbeat: the next track starts on the other deck at
-  // its first beat, tempo-matched to this one; the crossfader moves over T seconds (equal power) and,
-  // halfway, the basslines swap so two kick drums never fight. Then the tempo glides back to normal.
+  // ---------------- transitions: beatmatched blends, counted in bars ----------------
+  // The next track starts on the other deck at its first downbeat, time-stretched (key lock) to this track's tempo
+  // (half/double-time folded, at most +-8%), and it is released exactly on OUR next downbeat. Both beat grids come from
+  // rekordbox, or from listening (E.detectGrid) for files it never analysed. While the two play together a small
+  // phase-lock loop nudges the incoming deck's speed so the kicks stay on top of each other. The crossfader moves over
+  // 1-32 BARS (not seconds), the bass swaps over one bar in the middle, the outgoing deck is filtered thin at the
+  // end, then the borrowed tempo eases back to the track's own.
+  const BAR_STEPS = [1, 2, 4, 8, 16, 32];
+  const MAX_STRETCH = 0.08;
+  const LEAD = 14; // seconds of warning to load, listen to and line up the next track
+  const dbCache = new WeakMap();
+  const downbeatsOf = (d) => { const g = E.gridOf(d); if (!g) return []; let r = dbCache.get(g); if (!r) dbCache.set(g, r = g.filter((b) => b[1] === 1).map((b) => b[0] / 1000)); return r; };
+  const nearestBars = (x) => BAR_STEPS.reduce((a, c) => (Math.abs(Math.log(c / Math.max(0.5, x))) < Math.abs(Math.log(a / Math.max(0.5, x))) ? c : a), 1);
   function musicEnd(t, d) {
     const f = C.feats[t.id];
     const dur = d.el.duration || t.len || 0;
     return C.xf.skipTail && f?.endMs > 0 ? Math.min(dur, f.endMs / 1000 + 1) : dur;
   }
+  // where the blend starts on the outgoing track: { at (track s), T (real s), bars, span (track s) }
   function mixPoint(t, d) {
-    const end = musicEnd(t, d), T = Math.min(C.xf.T, Math.max(0, end - 1));
-    let at = end - T;
-    const beats = d.wave?.beats;
-    if (C.xf.beatStart && beats?.length) { // the downbeat just before
-      for (let i = beats.length - 1; i >= 0; i--) if (beats[i][1] === 1 && beats[i][0] / 1000 <= at) { at = beats[i][0] / 1000; break; }
+    const end = musicEnd(t, d), rate = d.el.playbackRate || 1, bpm = E.bpmNative(d);
+    const dbs = C.xf.beatStart ? downbeatsOf(d) : [];
+    if (!dbs.length || !bpm) { const T = Math.min(C.xf.T, Math.max(0, end - 1)); return { at: end - T, T, bars: 0, span: T }; }
+    const barS = 240 / bpm; // one bar, in track seconds
+    for (let bars = nearestBars(C.xf.T / (barS / rate)); bars >= 1; bars = bars > 1 ? bars / 2 : 0) {
+      let at = -1;
+      for (let i = dbs.length - 1; i >= 0; i--) if (dbs[i] + bars * barS <= end + 0.3) { at = dbs[i]; break; }
+      if (at >= 0) return { at, T: bars * barS / rate, bars, span: bars * barS };
     }
-    return { at, T: end - at };
+    const T = Math.min(C.xf.T, Math.max(0, end - 1));
+    return { at: end - T, T, bars: 0, span: T };
   }
+  // seconds into the bar (real time) for a deck, with the real length of one of its beats
+  const barSec = (d) => { const p = E.phase(d); return p ? { s: ((p.inBar - 1) + p.frac) * p.len / (d.el.playbackRate || 1), beat: p.len / (d.el.playbackRate || 1) } : null; };
+  const wrapTo = (v, P) => { v %= P; if (v > P / 2) v -= P; else if (v < -P / 2) v += P; return v; };
+  let glideId = 0;
   async function startMix() {
     const outD = C.deck, inD = E.other(outD);
-    const nextId = C.queue[C.qi + 1];
-    const nt = C.byId.get(nextId);
+    const nt = C.byId.get(C.queue[C.qi + 1]);
     if (!nt?.exists) return;
-    const { T } = mixPoint(C.cur, outD);
-    C.mix = { outD, inD, t0: performance.now(), T, track: nt, swapped: false };
+    const outT = C.cur;
+    const mix = C.mix = { outD, inD, track: nt, phase: 'loading', status: 'PREPARING MIX…', T: Math.max(1, mixPoint(outT, outD).T), bars: 0, synced: false, err: 0, fix: 0, fold: 1, base: 1 };
+    glideId++; // a tempo glide left over from the last blend must not fight this one
     E.resetDeck(inD);
     E.setFader(inD, 1);
     await E.load(inD, nt, trackUrl(nt));
-    if (!C.mix) return;
-    const w = await fetchWave(nt).catch(() => null);
-    inD.wave = w;
-    if (C.xf.beatStart && w?.beats?.length) inD.el.currentTime = w.beats.find((b) => b[1] === 1)?.[0] / 1000 || 0;
-    if (C.xf.matchTempo && C.cur.bpm && nt.bpm) {
-      let r = E.bpmNow(outD) / nt.bpm;
-      if (r > 1.5) r /= 2; else if (r < 0.67) r *= 2;
-      if (Math.abs(r - 1) <= 0.1) E.setPitch(inD, (r - 1) * 100);
+    if (C.mix !== mix) return;
+    inD.wave = await fetchWave(nt).catch(() => null);
+    if (C.mix !== mix) return;
+    let synced = false;
+    if (C.xf.beatStart) {
+      const [gi0, go0] = await Promise.all([E.ensureGrid(inD, 'start', trackUrl(nt)), E.ensureGrid(outD, 'end', trackUrl(outT))]);
+      synced = !!(gi0?.length && go0?.length);
     }
+    if (C.mix !== mix) return;
+    // tempo: the incoming deck takes ours (folded to within +-8%)
+    let fold = 1, base = 1;
+    const bOut = E.bpmNow(outD), bIn = E.bpmNative(inD);
+    if (synced && bOut && bIn) {
+      let r = bOut / bIn;
+      while (r > 1.41) { r /= 2; fold *= 2; }
+      while (r < 0.71) { r *= 2; fold /= 2; }
+      if (Math.abs(r - 1) <= MAX_STRETCH && C.xf.matchTempo) base = r;
+      else synced = false; // too far apart to stretch: a time blend instead
+    } else synced = false;
+    const nowOut = outD.el.currentTime, end = musicEnd(outT, outD);
+    let at = nowOut + 0.1, bars = 0, T = Math.max(1, Math.min(C.xf.T, end - nowOut - 0.5));
+    if (synced) {
+      const mp = mixPoint(outT, outD), dbs = downbeatsOf(outD), barS = 240 / E.bpmNative(outD);
+      let start = mp.at;
+      if (start < nowOut + 0.35) start = dbs.find((x) => x >= nowOut + 0.35) ?? -1; // loading took long: the next bar line
+      bars = mp.bars || 1;
+      while (bars > 1 && start + bars * barS > end + 0.3) bars /= 2;
+      if (start < 0 || start + barS > end + 0.5) synced = false;
+      else { at = start; T = bars * barS / (outD.el.playbackRate || 1); }
+    }
+    if (!synced) { // no beat grid, or tempos too far apart: blend by time, still matching the tempo when it is close
+      bars = 0; fold = 1; base = 1;
+      if (C.xf.matchTempo && bOut && bIn) { let r = bOut / bIn; if (r > 1.5) r /= 2; else if (r < 0.67) r *= 2; if (Math.abs(r - 1) <= 0.1) base = r; }
+    }
+    E.setPitch(inD, (base - 1) * 100);
+    const gi = E.gridOf(inD);
+    const inStart = ((gi || []).find((b) => b[1] === 1)?.[0] ?? 0) / 1000;
+    inD.el.currentTime = inStart;
     if (C.xf.bassSwap && T >= 3) E.setKill(inD, 'low', true);
+    Object.assign(mix, { phase: 'armed', synced, fold, at, T, bars, base, status: synced ? `SYNCED ${bOut.toFixed(0)} BPM` : 'TIME BLEND' });
     E.resume();
-    await inD.el.play().catch(() => {});
-    if (!C.mix) return;
-    C.mix.t0 = performance.now();
-    C.mix.started = true; // the fader only moves once the new track is actually playing
+    // now it waits: stepMix releases the new track on the downbeat
+  }
+  function releaseMix(m) {
+    m.phase = 'running';
+    m.t0 = performance.now();
+    m.started = true;
+    m.inD.el.play().catch(() => {});
+    toast(m.synced ? `MIXING → ${names(m.track).title.toUpperCase()} · SYNCED ${E.bpmNow(m.outD).toFixed(0)} BPM · ${m.bars} BAR${m.bars === 1 ? '' : 'S'}` : `MIXING → ${names(m.track).title.toUpperCase()} · ${Math.round(m.T)} s BLEND`);
   }
   function stepMix() {
     const m = C.mix;
-    if (!m?.started) return;
-    const p = Math.min(1, (performance.now() - m.t0) / 1000 / Math.max(0.1, m.T));
-    const fromA = m.outD === E.A;
-    E.setXf(fromA ? p : 1 - p);
-    if (C.xf.bassSwap && !m.swapped && p >= 0.5) { m.swapped = true; E.setKill(m.inD, 'low', false); E.setKill(m.outD, 'low', true); }
-    if (p >= 1) finishMix();
+    if (!m) return;
+    if (m.phase === 'armed') {
+      if (m.outD.el.paused && !m.outD.el.ended) return;
+      const wait = m.synced ? m.at - m.outD.el.currentTime : 0;
+      if (wait <= 0.045) releaseMix(m); // ~45 ms: the audio element's start-up delay
+      return;
+    }
+    if (m.phase !== 'running') return;
+    const { outD, inD } = m, fromA = outD === E.A;
+    let p;
+    if (m.synced) {
+      const outRate = outD.el.playbackRate || 1;
+      // phase-lock: keep the incoming deck's bar position on top of the outgoing one's
+      const a = barSec(outD), b = barSec(inD);
+      m.base = outRate * (E.bpmNative(outD) / E.bpmNative(inD)) / m.fold;
+      if (a && b && !inD.el.paused) {
+        const P = m.fold === 1 ? a.beat * 4 : Math.max(a.beat, b.beat);
+        const err = wrapTo(b.s - a.s, P);
+        m.err = err;
+        if (Math.abs(err) > 0.09 && m.fix < 4 && performance.now() - m.t0 > 120) { // late out of the gate: jump the difference
+          inD.el.currentTime = Math.max(0, inD.el.currentTime - err * (inD.el.playbackRate || 1)); m.fix++;
+        } else {
+          const nudge = Math.abs(err) < 0.004 ? 0 : Math.max(-0.035, Math.min(0.035, -err * 0.6));
+          const want = m.base * (1 + nudge);
+          if (Math.abs(inD.el.playbackRate - want) > 0.0002) inD.el.playbackRate = want;
+        }
+      }
+      p = (outD.el.currentTime - m.at) / (m.bars * 240 / E.bpmNative(outD));
+    } else p = (performance.now() - m.t0) / 1000 / Math.max(0.1, m.T);
+    p = Math.max(0, Math.min(1, p));
+    const e = p * p * (3 - 2 * p); // eased; the mixer's gains are still equal-power
+    E.setXf(fromA ? e : 1 - e);
+    if (C.xf.bassSwap && m.T >= 3) { // the kicks trade places over one bar around the middle
+      const half = m.bars ? 0.5 / m.bars : 0.1, q = Math.max(0, Math.min(1, (p - (0.5 - half)) / (2 * half)));
+      if (q <= 0) E.setKill(inD, 'low', true);
+      else if (q >= 1) { if (!m.swapped) { m.swapped = true; E.setKill(inD, 'low', false); E.setEq(inD, 'low', 0); E.setKill(outD, 'low', true); } }
+      else { E.setKill(inD, 'low', false); E.setKill(outD, 'low', false); E.setEq(inD, 'low', -26 * Math.pow(1 - q, 1.5)); E.setEq(outD, 'low', -26 * Math.pow(q, 1.5)); }
+    }
+    if (m.synced && p > 0.75) E.setFilter(outD, Math.min(0.55, (p - 0.75) * 2.2)); // the outgoing track thins out last
+    if (p >= 1 || outD.el.ended) finishMix();
   }
   function finishMix() {
     const m = C.mix;
@@ -481,9 +769,10 @@
     C.deck = m.inD;
     C.cur = m.track;
     C.qi++;
-    // glide the borrowed tempo back to the track's own over ~12 s
-    const d = m.inD, from = d.pitch;
-    if (Math.abs(from) > 0.05) { const t0 = performance.now(); const glide = () => { const k = Math.min(1, (performance.now() - t0) / 12000); if (C.deck !== d) return; E.setPitch(d, from * (1 - k)); if (k < 1) setTimeout(glide, 200); }; setTimeout(glide, 2000); }
+    // ease the borrowed tempo back to the track's own (smoothstep over ~16 s)
+    const d = m.inD, from = d.pitch, id = ++glideId;
+    d.el.playbackRate = 1 + from / 100;
+    if (Math.abs(from) > 0.05) { const t0 = performance.now(); const glide = () => { if (C.deck !== d || id !== glideId) return; const k = Math.min(1, (performance.now() - t0) / 16000); E.setPitch(d, from * (1 - k * k * (3 - 2 * k))); if (k < 1) setTimeout(glide, 150); }; setTimeout(glide, 1500); }
     afterStart(C.cur);
   }
   function cancelMix(keepCurrent) {
@@ -492,16 +781,17 @@
     C.mix = null;
     m.inD.el.pause();
     E.resetDeck(m.inD);
-    E.setKill(m.outD, 'low', false);
+    E.setKill(m.outD, 'low', false); E.setEq(m.outD, 'low', 0); E.setFilter(m.outD, 0);
     if (keepCurrent) E.setXf(m.outD === E.A ? 0 : 1);
   }
   let preloadFor = null;
   function checkMix() {
     if (C.mode !== 'player' || !C.cur || C.mix || au().paused || C.xf.T <= 0 || C.repeat === 'one') return;
     if (C.qi + 1 >= C.queue.length) return;
-    const { at } = mixPoint(C.cur, C.deck);
+    const { at, bars } = mixPoint(C.cur, C.deck);
     if (!isFinite(at) || at <= 1) return;
-    if (au().currentTime >= at && preloadFor !== C.cur.id + at) { preloadFor = C.cur.id + at; startMix(); }
+    const go = at - (bars ? LEAD * (au().playbackRate || 1) : 0);
+    if (au().currentTime >= go && preloadFor !== C.cur.id + at) { preloadFor = C.cur.id + at; startMix(); }
   }
 
   // output device: preview on headphones while the room hears something else
@@ -533,6 +823,9 @@
     const t = C.cur;
     $('#cr-play').textContent = au().paused ? '▶' : '❚❚';
     $('#cr-play').classList.toggle('on', !au().paused);
+    const bp = $('#cr-playall'), pl = !!C.cur && !au().paused;
+    bp.textContent = pl ? '❚❚' : '▶'; bp.classList.toggle('on', pl);
+    bp.title = pl ? 'Pause' : (C.cur && au().currentTime > 0 ? 'Resume' : 'Play this list');
     if (!t) return;
     const n = names(t), cam = camelot(t.key);
     $('#cr-npart').innerHTML = art(t, 'cr-npimg');
@@ -564,6 +857,7 @@
   async function loadWave(d, t) {
     const w = await fetchWave(t).catch(() => null);
     if (d.track?.id === t.id) { d.wave = w; drawWave(); }
+    if (d === C.deck && C.xf.T > 0 && C.xf.beatStart && !w?.beats?.length && d.track?.id === t.id) E.ensureGrid(d, 'end', trackUrl(t)).then(() => { if (d.track?.id === t.id) drawWave(); }); // files rekordbox never analysed: listen for the beat grid now, so the mix is ready
   }
   // tracks rekordbox never analysed: decode the audio once and take peaks
   async function decodeWave(t) {
@@ -655,11 +949,12 @@
 
   function barPos() {
     const p = E.phase(C.deck);
-    if (!p) return '';
+    if (!p) return C.mix ? C.mix.status : '';
     let bar = 0;
-    const beats = C.deck.wave.beats;
+    const beats = E.gridOf(C.deck);
     for (let i = 0; i <= p.i; i++) if (beats[i][1] === 1) bar++;
-    return `BAR ${bar} · ${p.inBar}/4 · ${E.bpmNow(C.deck).toFixed(1)} BPM${C.mix ? ' · MIXING →' : ''}`;
+    const mx = C.mix && C.mix.phase !== 'loading' ? ` · MIXING → ${C.mix.status}${C.mix.synced && C.mix.phase === 'running' ? ` · ${C.mix.bars} BARS · Δ${Math.round(Math.abs(C.mix.err) * 1000)} ms` : ''}` : C.mix ? ` · ${C.mix.status}` : '';
+    return `BAR ${bar} · ${p.inBar}/4 · ${E.bpmNow(C.deck).toFixed(1)} BPM${mx}`;
   }
   let barTick = 0;
   function tick() {
@@ -677,9 +972,9 @@
   function xfadeHtml(prefix) {
     return `<label class="set-l">CROSSFADE LENGTH <b id="${prefix}-tv">${C.xf.T ? `${C.xf.T} s` : 'OFF'}</b></label>
       <input type="range" class="slider" id="${prefix}-t" min="0" max="30" step="1" value="${C.xf.T}" />
-      <label class="check"><input type="checkbox" data-xf="beatStart"${C.xf.beatStart ? ' checked' : ''} /> start on the beat (downbeats line up)</label>
-      <label class="check"><input type="checkbox" data-xf="matchTempo"${C.xf.matchTempo ? ' checked' : ''} /> match tempo while blending</label>
-      <label class="check"><input type="checkbox" data-xf="bassSwap"${C.xf.bassSwap ? ' checked' : ''} /> bass swap halfway (no clashing kicks)</label>
+      <label class="check"><input type="checkbox" data-xf="beatStart"${C.xf.beatStart ? ' checked' : ''} /> beatmatch: bars, not seconds (grid + downbeats line up)</label>
+      <label class="check"><input type="checkbox" data-xf="matchTempo"${C.xf.matchTempo ? ' checked' : ''} /> stretch tempo to match (up to ±8%)</label>
+      <label class="check"><input type="checkbox" data-xf="bassSwap"${C.xf.bassSwap ? ' checked' : ''} /> bass swap in the middle (no clashing kicks)</label>
       <label class="check"><input type="checkbox" data-xf="skipTail"${C.xf.skipTail ? ' checked' : ''} /> skip the silent tail of each track</label>`;
   }
   function bindXfade(root, prefix) {
@@ -1015,7 +1310,7 @@
 
   // ---------------- keys ----------------
   window.addEventListener('keydown', (e) => {
-    if (HS.view !== 'crate' || C.mode !== 'player' || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    if (HS.view !== 'crate' || HS.inVJ() || C.mode !== 'player' || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     else if (e.key === 'ArrowRight') { cancelMix(true); au().currentTime = Math.min(au().duration || 0, au().currentTime + (e.shiftKey ? 30 : 5)); }
     else if (e.key === 'ArrowLeft') { cancelMix(true); au().currentTime = Math.max(0, au().currentTime - (e.shiftKey ? 30 : 5)); }
@@ -1026,7 +1321,7 @@
   });
 
   // shared with the DJ page
-  window.CRATE = { C, E, names, keyLabel, camelot, keyHue, art, fmtLen, fetchWave, trackUrl, renderRows, renderSide, doubles, CUE_COLORS, setMode };
+  window.CRATE = { C, E, names, keyLabel, camelot, keyHue, art, fmtLen, fetchWave, trackUrl, renderRows, renderSide, toggle, next, prev, renderPlayer, doubles, CUE_COLORS, setMode };
 
   syncTools();
   let loaded = false;

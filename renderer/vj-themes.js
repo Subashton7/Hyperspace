@@ -693,5 +693,125 @@ window.VJ_EXTRA = ({ TAU, H, stroke, circle, poly }) => {
     circle(ctx, 0, 0, R * 1.01);
   } };
 
+  // ================= LOOP PRODUCTION =================
+  // Built for recording loops: they read f.build (0..1 riser), f.drop (1 -> 0 after a drop) and f.beatPh, all capped.
+  // SACRED TUNNEL: nested polygons (triangle / hexagon / square / octagon) rushing toward you, with struts between rings
+  let tunZ = 0;
+  T.sactunnel = { name: 'SACRED TUNNEL', cat: 'LOOP', draw(ctx, R, f) {
+    tunZ += f.dt * (0.16 + f.bass * 0.34 + f.build * 0.7 + f.drop * 1.4);
+    const N = 16, sides = [6, 3, 6, 4, 6, 8], keep = [];
+    for (let i = 0; i < N; i++) {
+      const k = (i / N + tunZ) % 1, sc = Math.pow(k, 2.3) * 1.55 * (1 + f.beat * 0.05 + f.drop * 0.25), n = sides[(i + Math.floor(tunZ)) % sides.length];
+      keep.push({ k, sc, n, i });
+    }
+    keep.sort((a, b) => a.k - b.k); // far to near
+    let prev = null;
+    for (const r of keep) {
+      const rr = R * r.sc, a = Math.sin(Math.PI * Math.min(1, r.k * 1.15)) * (0.35 + f.level * 0.4 + f.drop * 0.3);
+      if (rr < 2 || a < 0.02) { prev = null; continue; }
+      const rot = f.rot * (r.i % 2 ? 1 : -1) * 0.55 + r.k * (1.1 + f.build * 1.5);
+      stroke(ctx, H(f.t, r.i), 55 + r.k * 25, Math.min(1, a), 0.8 + r.k * (2.4 + f.bass * 3));
+      poly(ctx, r.n, rr, rot);
+      if (prev && prev.n === r.n && r.i % 2 === 0) { // struts join each ring to the one behind it
+        stroke(ctx, H(f.t, r.i + 1), 60, Math.min(0.7, a * 0.7), 0.8 + r.k * 1.4);
+        ctx.beginPath();
+        for (let v = 0; v < r.n; v++) {
+          const a0 = rot + (v / r.n) * TAU, a1 = prev.rot + (v / r.n) * TAU;
+          ctx.moveTo(Math.cos(a0) * rr, Math.sin(a0) * rr);
+          ctx.lineTo(Math.cos(a1) * prev.rr, Math.sin(a1) * prev.rr);
+        }
+        ctx.stroke();
+      }
+      prev = { n: r.n, rr, rot };
+    }
+    // the vanishing point: a flower of life core that flares on the drop
+    stroke(ctx, H(f.t, 2), 80, 0.8, 1.5 + f.drop * 4);
+    circle(ctx, 0, 0, R * (0.05 + f.bass * 0.03 + f.drop * 0.18));
+    for (let i = 0; i < 6; i++) { const a = f.rot + (i / 6) * TAU, rr = R * (0.05 + f.drop * 0.18); circle(ctx, Math.cos(a) * rr, Math.sin(a) * rr, rr); }
+  } };
+
+  // MATRIX VORTEX: falling code that bends into a spiral and is sucked into the centre
+  const VG = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ΦΨΩ∆'.split('');
+  const vort = [];
+  T.matrixvortex = { name: 'MATRIX VORTEX', cat: 'LOOP', draw(ctx, R, f) {
+    const cap = 240;
+    while (vort.length < cap) vort.push({ r: 0.1 + Math.random() * 1.1, a: Math.random() * TAU, v: 0.5 + Math.random(), g: VG[(Math.random() * VG.length) | 0], c: (Math.random() * 3) | 0 });
+    const pull = 0.18 + f.bass * 0.35 + f.build * 0.6 + f.drop * 1.6;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const p of vort) {
+      p.r -= f.dt * p.v * pull * (0.4 + p.r);
+      p.a += f.dt * (0.35 + f.mid * 0.6 + f.build * 1.2) * (1.4 / (0.25 + p.r)) * 0.5;
+      if (p.r < 0.03) { p.r = 1.05 + Math.random() * 0.2; p.a = Math.random() * TAU; p.g = VG[(Math.random() * VG.length) | 0]; p.v = 0.5 + Math.random(); }
+      if (Math.random() < 0.02) p.g = VG[(Math.random() * VG.length) | 0];
+      const x = Math.cos(p.a) * p.r * R, y = Math.sin(p.a) * p.r * R * (0.9 + f.tilt * 0.1), size = 9 + p.r * 15 + f.bass * 5;
+      ctx.font = `${size | 0}px "Share Tech Mono", monospace`;
+      const head = p.r < 0.5 && f.beat > 0.5;
+      ctx.fillStyle = `hsla(${H(f.t, head ? p.c + 1 : 0)},100%,${head ? 88 : 52 + p.r * 18}%,${Math.min(1, 0.25 + (1 - p.r * 0.7) * 0.7)})`;
+      ctx.fillText(p.g, x, y);
+    }
+    stroke(ctx, H(f.t, 1), 75, 0.55 + f.drop * 0.4, 1.2 + f.drop * 3);
+    circle(ctx, 0, 0, R * (0.04 + f.beat * 0.02 + f.drop * 0.3));
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  } };
+
+  // STROBE KALEIDOSCOPE: petals mirrored around the centre; the colours swap (cyan / pink / purple) on every beat
+  let kbCount = 0, kbLast = 0;
+  T.kaleidoburst = { name: 'STROBE KALEIDOSCOPE', cat: 'LOOP', draw(ctx, R, f) {
+    if (f.beat > 0.9 && f.t - kbLast > 0.15) { kbCount++; kbLast = f.t; }
+    const segs = clamp(Math.round(f.fold), 4, 14) + (f.build > 0.6 ? 2 : 0);
+    ctx.rotate(f.rot * 0.5);
+    for (let s = 0; s < segs * 2; s++) {
+      ctx.save();
+      ctx.rotate((s / (segs * 2)) * TAU);
+      if (s % 2) ctx.scale(1, -1);
+      const n = 6;
+      for (let i = 0; i < n; i++) {
+        const k = (i + 1) / n, amp = sp(f, i * 4 + 2), rr = R * (0.12 + k * 0.85) * (1 + f.bass * 0.05 * (i % 2 ? 1 : -1));
+        stroke(ctx, H(f.t, i + kbCount), 52 + amp * 30 + f.beat * 18, 0.35 + amp * 0.5 + f.beat * 0.25, 1 + amp * 3 + f.drop * 3);
+        ctx.beginPath();
+        ctx.moveTo(rr * 0.5, 0);
+        ctx.quadraticCurveTo(rr * 0.8, rr * (0.2 + amp * 0.4 + f.mid * 0.15), rr, rr * 0.06 * Math.sin(f.t * 3 + i));
+        ctx.quadraticCurveTo(rr * 0.8, -rr * 0.12, rr * 0.5, 0);
+        ctx.stroke();
+        if (i % 2 === 0) { ctx.fillStyle = `hsla(${H(f.t, i + kbCount + 1)},100%,${70 + amp * 25}%,${0.4 + amp * 0.5})`; ctx.beginPath(); ctx.arc(rr, 0, 1.5 + amp * 4 + f.beat * 3, 0, TAU); ctx.fill(); }
+      }
+      ctx.restore();
+    }
+    stroke(ctx, H(f.t, kbCount), 80, 0.6 + f.drop * 0.4, 2 + f.bass * 3);
+    circle(ctx, 0, 0, R * (0.1 + f.beat * 0.04 + f.drop * 0.2));
+  } };
+
+  // GLITCH MERKABA: a star tetrahedron split into cyan / pink / purple ghosts, torn into slices that slide on the beat
+  T.glitchmerk = { name: 'GLITCH MERKABA', cat: 'LOOP', draw(ctx, R, f) {
+    const star = (r, rot) => {
+      ctx.beginPath();
+      for (let k = 0; k < 2; k++) for (let i = 0; i <= 3; i++) { const a = rot + (i / 3) * TAU + k * Math.PI + Math.PI / 2, x = Math.cos(a) * r, y = Math.sin(a) * r * (k ? 1 : 1); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+      circle(ctx, 0, 0, r * 0.52);
+    };
+    const r = R * 0.62 * (1 + f.bass * 0.08 + f.drop * 0.2), spread = (f.beat * 0.05 + f.drop * 0.1 + f.build * 0.02) * R;
+    ctx.globalCompositeOperation = 'lighter';
+    for (let c = 0; c < 3; c++) { // ghosts
+      ctx.save();
+      ctx.translate((c - 1) * spread, 0);
+      stroke(ctx, H(f.t, c), 58, 0.55, 1.5 + f.bass * 3 + f.drop * 3);
+      star(r, f.rot * 0.4 + c * 0.03 * f.beat);
+      ctx.restore();
+    }
+    // slices: horizontal bands that slide sideways (more of them as the build climbs, all of them on the drop)
+    const slices = 3 + Math.round(f.build * 4 + f.drop * 6), seed = Math.floor(f.t * 12);
+    for (let i = 0; i < slices; i++) {
+      const hsh = Math.abs(Math.sin(seed * 12.9898 + i * 78.233)) , y = (hsh * 2 - 1) * r, h = R * (0.015 + (i % 3) * 0.02), dx = (Math.abs(Math.sin(seed * 4.1 + i * 9.7)) - 0.5) * R * (0.15 + f.drop * 0.5 + f.beat * 0.2);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(-R, y, R * 2, h); ctx.clip();
+      ctx.translate(dx, 0);
+      stroke(ctx, H(f.t, i + 1), 70, 0.9, 2 + f.drop * 2);
+      star(r, f.rot * 0.4);
+      ctx.restore();
+    }
+    stroke(ctx, H(f.t, 2), 80, 0.7, 1.2);
+    circle(ctx, 0, 0, r * 1.12);
+  } };
+
   return T;
 };

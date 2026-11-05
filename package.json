@@ -1,7 +1,7 @@
 {
   "name": "hyperspace",
   "productName": "HYPERSPACE",
-  "version": "0.14.0",
+  "version": "0.16.0",
   "description": "HYPERSPACE: a Matrix-styled control deck for Windows: mic and camera kill switches, task manager, temperatures and fans, VJ visualizer, music crate, encrypted notes, phone remote.",
   "author": {
     "name": "HYPERSPACE"
@@ -44,6 +44,7 @@
     "files": [
       "src/**",
       "renderer/**",
+      "personal/**",
       "assets/**",
       "package.json"
     ],

@@ -11,7 +11,7 @@
 const { BrowserWindow, screen } = require('electron');
 const path = require('path');
 
-const MODULES = ['clock', 'vpn', 'temps', 'thermals', 'cpu', 'gpu', 'ram', 'fans', 'net', 'disk', 'drives', 'apps', 'media', 'crate', 'volume', 'shield', 'battery', 'uptime'];
+const MODULES = ['clock', 'vpn', 'temps', 'thermals', 'cpu', 'gpu', 'ram', 'fans', 'net', 'disk', 'drives', 'apps', 'media', 'crate', 'volume', 'shield', 'battery', 'uptime', 'vacuum', 'notes', 'todo'];
 const DEFAULTS = {
   enabled: false, mode: 'auto', width: 230, opacity: 0.94, hideFullscreen: true, floatH: 560,
   snap: false, // dropped = stays exactly there; true = snaps to screen edges and window corners
@@ -89,17 +89,46 @@ class SideDock {
       webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
     });
     this.win.hsDock = true;
+    this.painted = false;
     this.win.loadFile(path.join(this.root, 'renderer', 'sidedock.html'));
     // attached to a window: follow() shows it once it has found that window
-    this.win.once('ready-to-show', () => { if (this.cfg().place.type !== 'window') { this.place(); this.win.showInactive(); } });
+    this.win.setOpacity(0);
+    // show only after the page has really painted (an earlier show is the grey box), then fade in
+    this.win.webContents.once('did-finish-load', () => setTimeout(() => {
+      if (!this.win || this.win.isDestroyed()) return;
+      this.painted = true;
+      if (this.cfg().place.type !== 'window' && !this.userHidden && !this.covered) { this.place(); this.win.showInactive(); this.fadeIn(); }
+    }, 250));
     this.win.on('closed', () => { this.win = null; });
     this.open = false;
     clearInterval(this.fsTimer); clearInterval(this.followTimer);
     this.fsTimer = setInterval(() => this.checkFullscreen(), 2500);
-    this.followTimer = setInterval(() => { this.follow(); this.hover(); }, 120);
+    this.followTimer = setInterval(() => { this.follow(); this.hover(); if (++this.tick % 8 === 0) this.raise(); }, 120);
+    this.tick = 0;
+  }
+
+  fadeIn() {
+    const w = this.win; if (!w || w.isDestroyed()) return;
+    let o = 0; clearInterval(this.fadeTimer);
+    this.fadeTimer = setInterval(() => { o = Math.min(1, o + 0.1); try { w.setOpacity(o); } catch {} if (o >= 1) clearInterval(this.fadeTimer); }, 40);
+  }
+  // global hotkey / Nitro key: show or hide the dock over whatever is on screen (HYPERSPACE too)
+  toggle() {
+    if (!this.cfg().enabled) { this.userHidden = false; this.set({ enabled: true }); return true; }
+    if (!this.win || this.win.isDestroyed()) { this.userHidden = false; this.start(); return true; }
+    if (this.win.isVisible() && !this.userHidden) { this.userHidden = true; this.win.hide(); return false; }
+    this.userHidden = false; this.covered = false;
+    this.place(); this.win.setOpacity(1); this.win.showInactive(); this.isTop = null; this.layer(); this.setOpen(true); this.mouse(true); this.push();
+    return true;
+  }
+  // keep the dock above HYPERSPACE and other always-on-top windows (they share a layer; the later one wins)
+  raise() {
+    if (!this.win || this.win.isDestroyed() || !this.win.isVisible() || this.userHidden || this.drag) return;
+    if (this.isTop) { this.win.setAlwaysOnTop(true, 'screen-saver'); this.win.moveTop(); }
   }
 
   stop() {
+    clearInterval(this.fadeTimer);
     clearInterval(this.fsTimer); clearInterval(this.followTimer);
     if (this.win && !this.win.isDestroyed()) this.win.destroy();
     this.win = null;
@@ -134,6 +163,7 @@ class SideDock {
     const c = this.cfg();
     if (c.place.type === 'window' && !this.host) return; // follow() places it once it has found the window
     this.win.setBounds(this.bounds());
+    if (this.painted && !this.userHidden && !this.covered && !this.win.isVisible() && c.place.type !== 'window') { this.win.setOpacity(1); this.win.showInactive(); }
     this.layer();
     this.mouse(this.open);
     this.push();
@@ -192,6 +222,15 @@ class SideDock {
     const solid = !this.autoHide() || this.open || !!this.drag;
     dbg('mouse solid=', solid);
     this.win.setIgnoreMouseEvents(!solid, { forward: true });
+  }
+
+  // The dock never takes keyboard focus, so typing in the QUICK NOTE box needs it for a moment: on while the box is
+  // being used, off again as soon as it loses focus.
+  typing(on) {
+    if (!this.win || this.win.isDestroyed()) return false;
+    this.win.setFocusable(!!on);
+    if (on) this.win.focus();
+    return !!on;
   }
 
   // ---------------- drag + snap ----------------
@@ -302,7 +341,7 @@ class SideDock {
       if (host.minimized || !host.visible) { if (this.win.isVisible()) this.win.hide(); return; }
       const nb = this.bounds(), b = this.win.getBounds();
       if (nb.x !== b.x || nb.y !== b.y || nb.height !== b.height || nb.width !== b.width) this.win.setBounds(nb);
-      if (!this.win.isVisible() && !this.covered) { this.win.showInactive(); this.layer(); this.mouse(this.open); this.push(); }
+      if (!this.win.isVisible() && !this.covered && !this.userHidden && this.painted) { this.win.setOpacity(1); this.win.showInactive(); this.layer(); this.mouse(this.open); this.push(); }
       // its window came to the front (or went to the back): on top with it, or step back with it
       if (!!host.fg !== !!wasFg) this.layer();
     } catch {} finally { this.following = false; }
@@ -321,7 +360,7 @@ class SideDock {
     }
     if (cov === this.covered) return;
     this.covered = cov;
-    if (cov) this.win.hide(); else { this.place(); this.win.showInactive(); }
+    if (cov) this.win.hide(); else if (!this.userHidden && this.painted) { this.place(); this.win.showInactive(); }
   }
 }
 

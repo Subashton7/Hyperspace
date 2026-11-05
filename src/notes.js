@@ -163,7 +163,9 @@ class NotesVault extends EventEmitter {
     }
     this.saveLocalKey();
     this.touch();
-    await this.load();
+    // Fast path: the everyday notes are already in memory (only the journal pages were dropped when it locked),
+    // so unlocking only reads the files that are not loaded yet instead of re-reading and re-decrypting everything.
+    if (this._loadedNk && this.notes.size && meta.nk) await this.loadMissing(); else await this.load();
     this.emit('change', { unlocked: true });
     return { notes: this.notes.size };
   }
@@ -185,6 +187,10 @@ class NotesVault extends EventEmitter {
   }
   saveLocalKey() {
     if (!this.nkey) return;
+    // the notes key does not change when the journal unlocks: writing both laptop copies again each time was the slow part
+    const tag = this.nkey.toString('hex');
+    if (this._savedTag === tag) return;
+    this._savedTag = tag;
     if (this.localKeyFile && this.protect) {
       try { fs.mkdirSync(path.dirname(this.localKeyFile), { recursive: true }); fs.writeFileSync(this.localKeyFile, this.protect(this.nkey)); } catch {}
     }
@@ -229,6 +235,17 @@ class NotesVault extends EventEmitter {
     this.syncAll().catch(() => {});
     return true;
   }
+  // Pages imported from OneNote that an older version locked only because their NOTEBOOK was called Journal go back to
+  // everyday notes (never one the user locked on purpose with the MOVE box: those carry jm).
+  async relaxImported() {
+    let n = 0;
+    for (const x of [...this.notes.values()]) {
+      // only the dated entries (or a journal / diary / password section) stay locked; every other page goes back to everyday notes
+      if (!x.journal || x.jm || isPrivate(x.notebook, x.section) || isDateTitle(x.title)) continue;
+      try { await this.save({ ...x, journal: false, keepDates: true, updated: x.updated }); n++; } catch {}
+    }
+    return n;
+  }
   // locks the journal only: everyday notes stay open
   lock(why = 'locked') {
     if (!this.key) return;
@@ -238,27 +255,37 @@ class NotesVault extends EventEmitter {
     for (const [i, n] of this.notes) if (n.journal) { this.notes.delete(i); this.lockedJournal++; }
     this.emit('change', { unlocked: false, why });
   }
-  closeAll() { if (this.key) this.key.fill(0); if (this.nkey) this.nkey.fill(0); this.key = this.nkey = null; this.notes.clear(); }
+  closeAll() { this._loadedNk = false; if (this.key) this.key.fill(0); if (this.nkey) this.nkey.fill(0); this.key = this.nkey = null; this.notes.clear(); }
 
   // ---------------- notes ----------------
   async load() {
     this.notes.clear();
+    await this.loadMissing(true);
+  }
+  // reads note files in parallel batches; with full=false only the files whose note is not in memory yet
+  async loadMissing(full = false) {
     const dir = path.join(this.dir, 'notes');
     let files = [];
     try { files = await fsp.readdir(dir); } catch {}
+    files = files.filter((x) => x.endsWith('.hsn') && (full || !this.notes.has(x.slice(0, -4))));
     let bad = 0, locked = 0;
-    for (const f of files.filter((x) => x.endsWith('.hsn'))) {
+    const one = async (f) => {
       try {
-        const n = JSON.parse(this.openAny(await fsp.readFile(path.join(dir, f)), f.slice(0, -4)).data.toString('utf8'));
+        const buf = await fsp.readFile(path.join(dir, f)), nid = f.slice(0, -4);
+        // the files still missing are mostly journal pages: try the journal key first (a wrong-key try costs a full read)
+        const plain = !full && this.key ? (() => { try { return open(this.key, buf, nid); } catch { return this.openAny(buf, nid).data; } })() : this.openAny(buf, nid).data;
+        const n = JSON.parse(plain.toString('utf8'));
         if (!n.gone) this.notes.set(n.id, n);
       } catch { if (this.key) bad++; else locked++; }
-    }
+    };
+    for (let i = 0; i < files.length; i += 24) await Promise.all(files.slice(i, i + 24).map(one));
     this.unreadable = bad; this.lockedJournal = locked;
+    if (this.nkey) this._loadedNk = true;
   }
   list() {
     this.touch();
     return [...this.notes.values()].map(({ id: i, title, notebook, section, created, updated, deleted, journal, body, blobs }) =>
-      ({ id: i, title, notebook, section, created, updated, deleted: !!deleted, journal: !!journal, size: (body || '').length, preview: (body || '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]*)\]\(hs-blob:[^)]*\)/g, '📎 $1').replace(/[#*>`~_\[\]()|-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140), pics: (blobs || []).length, todos: ((body || '').match(/^\s*([-*]|\d+\.)\s\[ \]/gm) || []).length }));
+      ({ id: i, title, notebook, section, created, updated, deleted: !!deleted, journal: !!journal, dated: isDateTitle(title), size: (body || '').length, preview: (body || '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]*)\]\(hs-blob:[^)]*\)/g, '📎 $1').replace(/[#*>`~_\[\]()|-]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140), pics: (blobs || []).length, todos: ((body || '').match(/^\s*([-*]|\d+\.)\s\[ \]/gm) || []).length }));
   }
   get(i) { this.touch(); return this.notes.get(i) || null; }
   async save(n) {
@@ -395,7 +422,22 @@ class NotesVault extends EventEmitter {
   stop() { clearInterval(this.timer); clearInterval(this.syncTimer); clearInterval(this.watchTimer); this.lock('closing'); }
 }
 
-// notebooks/sections that stay behind the password: the journal, and anything holding passwords
-function isPrivate(notebook, section) { return /journal|diary|password/i.test(`${notebook || ''} ${section || ''}`); }
+// what stays behind the password: a SECTION called journal / diary / passwords (the notebook around it stays open),
+// or a notebook called diary / passwords. A notebook merely called "Journal" no longer locks everything inside it.
+// does a page title look like a date (a journal entry)? ISO, "March 4, 2019", "4 March 2019", "3/4/2019", optional weekday and time
+function isDateTitle(title) {
+  let t = String(title || '').trim().replace(/\s+/g, ' ');
+  if (!t) return false;
+  const M = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+  t = t.replace(/^(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\.?,?\s+/i, '');
+  t = t.replace(/[,\s]+(?:at\s+)?\d{1,2}[:.]\d{2}(?::\d{2})?\s*(?:am|pm)?$/i, '').replace(/[T\s]\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?$/i, '');
+  return [
+    /^\d{4}[-./]\d{1,2}[-./]\d{1,2}$/,
+    /^\d{1,2}[-./]\d{1,2}[-./](?:\d{4}|\d{2})$/,
+    /^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}$/i,
+    /^\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?,?\s+\d{4}$/i,
+  ].some((r) => r.test(t));
+}
+function isPrivate(notebook, section) { return /diary|password/i.test(notebook || '') || /journal|diary|password/i.test(section || ''); }
 
 module.exports = { NotesVault, isPrivate };

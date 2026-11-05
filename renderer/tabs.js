@@ -8,17 +8,23 @@
   const QS = new URLSearchParams(location.search);
   const SOLO = HS.solo;
   const NAMES = Object.fromEntries($$('.nav').map((b) => [b.dataset.view, b.querySelector('span').textContent]));
-  const valid = (v) => NAMES[v] && !$(`.nav[data-view="${v}"]`).classList.contains('sealed');
+  const MV = window.hsMovedViews || {}; // pages that now live inside another page (see sidebar.js)
+  const valid = (v) => NAMES[v] && !$(`.nav[data-view="${v}"]`).classList.contains('sealed') && !(v in MV);
   const icon = (v) => $(`.nav[data-view="${v}"] svg`)?.outerHTML || '';
   let tabs = [], active = 0;
   try {
-    const s = !SOLO && JSON.parse(localStorage.getItem('tabs') || 'null');
-    if (s?.tabs?.length) { tabs = s.tabs.filter((t) => valid(t.view)); active = Math.min(s.active || 0, tabs.length - 1); }
+    // the main-process file copy (hs.uiState.tabs) is written on every change and survives a hard quit; localStorage is the fallback
+    const s = !SOLO && (hs.uiState?.tabs?.tabs?.length ? hs.uiState.tabs : JSON.parse(localStorage.getItem('tabs') || 'null'));
+    if (s?.tabs?.length) {
+      const seen = new Set(); let a = Math.min(s.active || 0, s.tabs.length - 1);
+      tabs = s.tabs.map((t, i) => { const v = MV[t.view] || t.view; return { view: v, i }; }).filter((t) => { if (!valid(t.view) || seen.has(t.view)) return false; seen.add(t.view); return true; });
+      active = Math.max(0, tabs.findIndex((t) => t.i === a)); tabs = tabs.map((t) => ({ view: t.view }));
+    }
   } catch {}
-  if (SOLO && valid(QS.get('view'))) tabs = [{ view: QS.get('view') }];
+  if (SOLO && valid(MV[QS.get('view')] || QS.get('view'))) tabs = [{ view: MV[QS.get('view')] || QS.get('view') }];
   if (!tabs.length) tabs = [{ view: valid(HS.view) ? HS.view : 'nexus' }];
   active = Math.max(0, active);
-  const save = () => { if (!SOLO) try { localStorage.setItem('tabs', JSON.stringify({ tabs, active })); } catch {} };
+  const save = () => { if (SOLO) return; const v = { tabs, active }; try { localStorage.setItem('tabs', JSON.stringify(v)); } catch {} try { hs.uiStateSet?.('tabs', v); } catch {} };
 
   function render() {
     strip.innerHTML = tabs.map((t, i) => `<div class="tab${i === active ? ' on' : ''}" data-i="${i}" title="${NAMES[t.view]} · drag it away from the window to make it its own HYPERSPACE">
@@ -47,6 +53,20 @@
     if (tabs.length > 1) close(i);
     toast(`${NAMES[view]} → NEW WINDOW`);
   }
+
+  // right-click a tab
+  strip.addEventListener('contextmenu', (e) => {
+    const t = e.target.closest('.tab');
+    if (!t) return;
+    const i = +t.dataset.i;
+    window.hsMenu?.(e, [
+      { label: 'Close tab', run: () => close(i) },
+      { label: 'Close other tabs', off: tabs.length < 2, run: () => { const keep = tabs[i]; tabs = [keep]; active = 0; go(0); } },
+      { label: 'Close tabs to the right', off: i >= tabs.length - 1, run: () => { tabs.splice(i + 1); if (active > i) active = i; go(active); } },
+      '-',
+      { label: 'Open in its own window', run: () => popOut(i) },
+    ], NAMES[tabs[i].view]);
+  });
 
   // every page change (sidebar, widgets, shortcuts, status bar) lands in the current tab
   HS.onView((v) => {
@@ -158,6 +178,7 @@
       return;
     }
     if (!d.moved) return; // a click; handled by the click listener
+    let from = null; try { from = d.el.getBoundingClientRect(); } catch {}
     if (d.to !== d.i) {
       const cur = tabs[active];
       const [m] = tabs.splice(d.i, 1);
@@ -165,6 +186,10 @@
       active = tabs.indexOf(cur);
     }
     render();
+    try { // the rabbit tows the dropped tab to its new slot (skipped if it did not really move)
+      const el = d.to !== d.i ? strip.querySelectorAll('.tab')[d.to] : null;
+      if (el && from) { const to = el.getBoundingClientRect(); if (Math.hypot(to.left - from.left, to.top - from.top) >= 8) document.dispatchEvent(new CustomEvent('twr', { detail: { do: 'tow', el, from, to } })); }
+    } catch {}
   }
   strip.addEventListener('pointerup', endDrag);
   strip.addEventListener('pointercancel', endDrag);

@@ -1,0 +1,6 @@
+/* ACTION ANIMATIONS: one pooled overlay for actionfx.js. Never catches clicks. */
+#hs-actionfx { position: fixed; inset: 0; z-index: 95; pointer-events: none; overflow: hidden; }
+#hs-actionfx > span, #hs-actionfx > svg { position: fixed; display: block; font: 12px monospace; line-height: 1; will-change: transform, opacity; text-shadow: 0 0 6px currentColor; }
+#hs-actionfx > span:not([style*="width"]) { width: auto; height: auto; }
+body.lite #hs-actionfx { opacity: .85; }
+@media (prefers-reduced-motion: reduce) { #hs-actionfx { display: none; } }

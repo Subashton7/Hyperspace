@@ -4,7 +4,7 @@
 #intro.fade { opacity: 0; pointer-events: none; }
 #intro.gone { display: none; }
 /* its own graphics layer: the moving canvas underneath doesn't make the big glowing title repaint every frame */
-.intro-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; opacity: 0; pointer-events: none; transition: opacity .35s ease; white-space: nowrap; will-change: transform, opacity; }
+.intro-title { position: absolute; left: 50%; top: 86%; transform: translate(-50%, -50%); text-align: center; opacity: 0; pointer-events: none; transition: opacity .35s ease; white-space: nowrap; will-change: transform, opacity; }
 .intro-title.show { opacity: 1; }
 .intro-title.warp { opacity: 0; transform: translate(-50%, -50%) scale(2.6); transition: transform .9s cubic-bezier(.7,0,1,.5), opacity .8s ease; }
 .it-main {
@@ -599,3 +599,32 @@ html.remote #link-btn, html.remote .wbtn { display: none; }
 }
 .ab-cool { grid-area: cool; }
 .ab-fans { min-height: 340px; }
+
+/* fan presets (afterburner.js) */
+.fp-box { margin: 6px 14px 10px; padding: 10px 12px; border: 1px solid var(--panel-edge); background: rgba(0, 18, 7, 0.45); }
+.fp-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 800 12px var(--display); letter-spacing: 2px; }
+.fp-head .fp-active { flex: 1; font: 12px var(--mono); letter-spacing: 1px; color: var(--g); }
+.fp-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 6px; }
+.fp-list button { position: relative; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; padding: 8px 12px; min-width: 130px; border: 1px solid var(--panel-edge); background: rgba(0, 18, 7, 0.6); color: #b8ffd0; cursor: pointer; text-align: left; }
+.fp-list button b { font: 800 12px var(--display); letter-spacing: 2px; color: #eafff0; }
+.fp-list button span { font-size: 10px; color: #7fd8a0; }
+.fp-list button i { position: absolute; top: 4px; right: 6px; font: 9px var(--mono); font-style: normal; color: var(--g); letter-spacing: 1px; }
+.fp-list button:hover:not(:disabled) { border-color: var(--g); }
+.fp-list button.on { border-color: var(--g); background: rgba(0, 255, 110, 0.16); box-shadow: inset 0 0 0 1px var(--g); }
+.fp-list button:disabled { opacity: .4; cursor: default; }
+.fp-ask { display: flex; gap: 8px; margin-top: 8px; } .fp-ask input { flex: 1; background: #00120a; border: 1px solid var(--g); color: #eafff0; padding: 4px 8px; font: 12px var(--mono); }
+.fp-note { font-size: 10px; }
+/* thermal alerts (thermal.js) */
+.ta-box { margin: 6px 14px 14px; padding: 10px 12px; border: 1px solid var(--panel-edge); background: rgba(0, 18, 7, 0.45); }
+.ta-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 800 12px var(--display); letter-spacing: 2px; }
+.ta-head .sp { flex: 1; }
+.ta-set { display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0; font: 11px var(--mono); color: #7fd8a0; }
+.ta-set label { display: flex; align-items: center; gap: 5px; }
+.ta-set input[type=number] { width: 54px; background: #00120a; border: 1px solid var(--panel-edge); color: #eafff0; padding: 2px 4px; font: 11px var(--mono); }
+.ta-box canvas { width: 100%; height: 70px; display: block; }
+.ta-cap { font: 10px var(--mono); color: #7fd8a0; display: flex; justify-content: space-between; }
+
+/* OPERATIONS and FANS hold folded-in sections below the main layout: keep the main layout a full screen tall and let the page scroll */
+#view-nexus.active > * { flex-shrink: 0; }
+#view-nexus.active > .nexus-grid { flex: 0 0 auto; height: max(600px, calc(100vh - 170px)); }
+#view-afterburner.active > * { flex-shrink: 0; }

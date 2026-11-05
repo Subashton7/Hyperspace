@@ -106,8 +106,9 @@
   });
 
   hs.on('routed', (e) => { toast(`${e.glyph || '⇶'} ${e.rule} · ${e.newName}`); load(); });
-  hs.on('router', () => { if (HS.view === 'router') load(); });
+  hs.on('router', () => { if (window.hsSecOpen?.('router')) load(); });
   hs.on('router-error', (m) => toast(`ROUTER: ${m}`, true));
-  HS.onView((v) => { if (v === 'router') load(); });
+  HS.onView(() => { if (window.hsSecOpen?.('router')) load(); });
+  document.addEventListener('hs-sec', (e) => { if (e.detail.name === 'router' && e.detail.open) load(); });
   load();
 })();

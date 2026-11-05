@@ -1,0 +1,83 @@
+/* SETTINGS > SECRETS + reveal popup (eggs-settings.js) AND the styles for the v2 eggs in eggs.js (panels, goofy effects) */
+.eg-master { margin-top: 12px; padding: 14px 20px; border: 2px solid var(--g-dim); cursor: pointer; display: flex; flex-direction: column; gap: 4px; text-align: center; font-family: Orbitron, 'Share Tech Mono', monospace; letter-spacing: 4px; font-size: 20px; color: var(--g-mid); background: rgba(0,0,0,.35); transition: .2s; }
+.eg-master small { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 1.5px; color: var(--g-soft); }
+.eg-master.on { border-color: var(--g); color: var(--g-hot); box-shadow: 0 0 20px rgba(0,255,110,.35), inset 0 0 20px rgba(0,255,110,.1); }
+.eg-wide { margin-top: 12px; }
+.eg-bar { height: 10px; border: 1px solid var(--g-dim); background: rgba(0,0,0,.5); margin-bottom: 8px; }
+.eg-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--g-mid), var(--g)); box-shadow: 0 0 8px var(--g); transition: width .5s; }
+.eg-clue { font-style: italic; color: var(--g-soft); letter-spacing: 1px; opacity: .8; margin: 8px 0 10px; }
+.eg-hk { border-color: var(--g); }
+.eg-list { display: flex; flex-direction: column; gap: 2px; }
+.eg-row { display: grid; grid-template-columns: 150px 150px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; border-bottom: 1px solid rgba(0,255,110,.1); font-size: 12px; }
+.eg-row .eg-name { color: var(--g-mid); letter-spacing: 1px; }
+.eg-row.found .eg-name { color: var(--g-hot); }
+.eg-row code { color: var(--g); background: rgba(0,255,110,.08); padding: 1px 6px; margin-right: 4px; }
+.eg-row code.mask { color: var(--g-dim); letter-spacing: 3px; }
+.eg-hint { color: var(--g-soft); } .eg-hint em { display: block; font-style: normal; color: var(--g-mid); font-size: 11px; }
+.eg-try { padding: 3px 10px; font-size: 10px; }
+@media (max-width: 900px) { .eg-row { grid-template-columns: 1fr; } }
+.egr-back { position: fixed; inset: 0; z-index: 9700; background: rgba(0,6,2,.8); display: grid; place-items: center; }
+.egr-box { width: min(760px, 92vw); max-height: 86vh; display: flex; flex-direction: column; background: rgba(0,14,6,.97); border: 1px solid var(--g); box-shadow: 0 0 40px rgba(0,255,110,.35); animation: eggPop .25s steps(5, end); }
+.egr-h { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--g-dim); letter-spacing: 3px; color: var(--g-hot); }
+.egr-x { font-size: 22px; color: var(--g-hot); }
+.egr-b { padding: 12px 16px; overflow: auto; } .egr-b h4 { margin: 14px 0 6px; color: var(--g); letter-spacing: 3px; font-size: 11px; }
+.egr-hk { padding: 8px 10px; border: 1px dashed var(--g); color: var(--g-hot); }
+.egr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 12px; }
+.egr-grid div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; } .egr-grid code { color: var(--g); } .egr-grid span { color: var(--g-soft); text-align: right; }
+.egr-f { padding: 10px 14px; border-top: 1px solid var(--g-dim); display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ===== v2 eggs: panels ===== */
+.egg-pnl { position: fixed; z-index: 9450; width: 300px; max-width: 94vw; background: rgba(2,14,8,.97); border: 1px solid #00ff9c; box-shadow: 0 0 22px rgba(0,255,156,.3); font: 12px/1.5 var(--mono, Consolas, monospace); color: #d6ffe9; animation: eggPop .22s steps(5, end); }
+.egg-pnl.out { opacity: 0; transition: opacity .17s; }
+.ep-h { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid rgba(0,255,156,.35); cursor: move; letter-spacing: .2em; color: #00ff9c; user-select: none; }
+.ep-x { font-size: 20px; line-height: 1; color: #d6ffe9; padding: 0 4px; } .ep-x:hover { color: #ff3d6e; }
+.ep-b { padding: 10px; display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow: auto; }
+.ep-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.ep-in, .ep-ta { flex: 1; min-width: 0; background: rgba(0,0,0,.55); border: 1px solid rgba(0,255,156,.4); color: #d6ffe9; padding: 5px 8px; font: inherit; }
+.ep-in.sm { flex: 0 0 64px; } .ep-ta { min-height: 80px; resize: vertical; width: 100%; box-sizing: border-box; }
+.ep-in:focus, .ep-ta:focus { outline: none; border-color: #00ff9c; box-shadow: 0 0 8px rgba(0,255,156,.4); }
+.ep-btn { border: 1px solid rgba(0,255,156,.5); padding: 4px 10px; color: #d6ffe9; letter-spacing: .1em; font-size: 11px; } .ep-btn:hover, .ep-btn.on { background: rgba(0,255,156,.18); }
+.ep-big { font-size: 30px; text-align: center; color: #d6ffe9; text-shadow: 0 0 12px #00ff9c; word-break: break-all; min-height: 1.2em; } .ep-big.sm { font-size: 14px; }
+.ep-big.spin { opacity: .6; } .ep-big.flipc { animation: eggFlipC .5s linear; }
+@keyframes eggFlipC { to { transform: rotateY(1080deg); } }
+.ep-dim { color: #6fb08f; font-size: 11px; }
+.ep-bar { height: 6px; border: 1px solid rgba(0,255,156,.4); } .ep-bar i { display: block; height: 100%; width: 0; background: #00ff9c; transition: width .3s linear; }
+.ep-list { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow: auto; } .ep-list em { font-style: normal; color: #6fb08f; }
+.ep-clip, .ep-copyrow { padding: 3px 6px; border: 1px solid transparent; cursor: pointer; white-space: pre-wrap; word-break: break-word; } .ep-clip:hover, .ep-copyrow:hover { border-color: #00ff9c; background: rgba(0,255,156,.1); }
+.ep-copyrow span { float: right; color: #00ff9c; font-size: 10px; }
+.ep-sw { height: 46px; border: 1px solid #00ff9c; } .ep-dot { width: 18px; height: 18px; border: 1px solid #00ff9c; cursor: pointer; display: inline-block; }
+.ep-zone { display: flex; justify-content: space-between; gap: 8px; padding: 2px 4px; border-bottom: 1px solid rgba(0,255,156,.12); } .ep-zone b { font-weight: 400; color: #d6ffe9; } .ep-zone button { color: #6fb08f; }
+.egg-chips { position: fixed; left: 90px; bottom: 54px; z-index: 9300; display: flex; gap: 6px; }
+.egg-chips button { background: rgba(2,14,8,.92); border: 1px solid #00ff9c; padding: 4px 8px; font: 11px var(--mono, monospace); color: #d6ffe9; } .egg-chips em { font-style: normal; color: #00ff9c; margin-right: 6px; letter-spacing: .1em; }
+.egg-bubble { position: fixed; left: 24px; bottom: 56px; z-index: 9600; max-width: 280px; padding: 10px 14px; background: rgba(2,14,8,.96); border: 1px solid #00ff9c; color: #d6ffe9; font: 13px var(--mono, monospace); border-radius: 12px 12px 12px 2px; animation: eggPop .3s steps(5, end); } .egg-bubble.out { opacity: 0; transition: opacity .4s; }
+/* goofy */
+html.egg-disco { animation: eggHue 2s linear infinite; } @keyframes eggHue { from { filter: hue-rotate(0); } to { filter: hue-rotate(360deg); } }
+.egg-ball { position: fixed; left: 50%; top: -10px; z-index: 9500; width: 90px; margin-left: -45px; text-align: center; animation: eggDrop .8s cubic-bezier(.3,1.4,.5,1); pointer-events: none; } .egg-ball.out { transition: transform .7s; transform: translateY(-200px); }
+.egg-ball u { display: block; width: 2px; height: 70px; background: #aaa; margin: 0 auto; }
+.egg-ball i { display: block; width: 90px; height: 90px; border-radius: 50%; background: repeating-conic-gradient(#ddd 0 10deg, #777 10deg 20deg); box-shadow: 0 0 40px #fff; animation: eggSpin 1.2s linear infinite; }
+@keyframes eggDrop { from { transform: translateY(-220px); } } @keyframes eggSpin { to { filter: hue-rotate(360deg) brightness(1.4); } }
+.egg-spots { position: fixed; inset: 0; z-index: 9400; pointer-events: none; background: radial-gradient(circle at 20% 30%, rgba(255,255,255,.22) 0 40px, transparent 41px), radial-gradient(circle at 70% 60%, rgba(255,255,255,.18) 0 50px, transparent 51px), radial-gradient(circle at 45% 80%, rgba(255,255,255,.2) 0 30px, transparent 31px); animation: eggSpot 1.6s ease-in-out infinite alternate; } @keyframes eggSpot { to { transform: translate(8vw, 6vh) rotate(8deg); } }
+.egg-kon { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 9500; text-align: center; padding: 18px 26px; background: rgba(2,14,8,.96); border: 2px solid #ffee55; color: #ffee55; font: 700 18px var(--mono, monospace); animation: eggPop .3s steps(5, end); } .egg-kon span { display: block; font-size: 30px; margin-top: 8px; color: #00ff9c; } .egg-kon.out { opacity: 0; transition: opacity .5s; }
+.egg-nyan { position: fixed; left: -400px; z-index: 9500; display: flex; align-items: center; pointer-events: none; animation: eggFly 4s linear forwards; } .egg-nyan svg { width: 114px; height: 72px; } .egg-nyan .tr { display: flex; flex-direction: column; width: 220px; height: 54px; animation: eggBob .3s steps(2) infinite; } .egg-nyan .tr i { flex: 1; } .egg-nyan .nl { animation: eggLeg .25s steps(2) infinite; }
+@keyframes eggFly { to { left: calc(100vw + 40px); } } @keyframes eggBob { 50% { transform: translateY(4px); } } @keyframes eggLeg { 50% { transform: translateY(-1px); } }
+.egg-confetti { position: fixed; inset: 0; z-index: 9500; pointer-events: none; overflow: hidden; } .egg-confetti span { position: absolute; top: -30px; font-family: monospace; font-weight: 700; animation: eggFall linear forwards; text-shadow: 0 0 6px currentColor; }
+@keyframes eggFall { to { transform: translate(var(--dx), 110vh) rotate(var(--rx)); } }
+.egg-tear { position: fixed; inset: 0; z-index: 9500; pointer-events: none; } .egg-tear i { position: absolute; left: 0; right: 0; background: rgba(255,0,200,.18); mix-blend-mode: difference; animation: eggTear .22s steps(2) 4; } @keyframes eggTear { 50% { transform: translateX(var(--tx)); } }
+.egg-term { position: fixed; left: 50%; top: 35%; transform: translateX(-50%); z-index: 9500; width: 380px; padding: 12px 14px; background: #000; border: 1px solid #00ff9c; font: 13px/1.6 var(--mono, monospace); color: #00ff9c; animation: eggPop .2s steps(4, end); } .egg-term .r { color: #ff3d6e; } .egg-term.out { opacity: 0; transition: opacity .5s; }
+.egg-term u { display: inline-block; width: 8px; height: 13px; background: #00ff9c; animation: eggBlink 1s steps(2) infinite; }
+.egg-flash { position: fixed; inset: 0; z-index: 9500; pointer-events: none; box-shadow: inset 0 0 0 10px #ffee55, inset 0 0 80px #ffee55; animation: eggFl .7s ease-out forwards; } @keyframes eggFl { to { opacity: 0; } }
+.egg-bell { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 9500; text-align: center; color: #ffee55; font-family: monospace; } .egg-bell pre { margin: 0; font-size: 20px; animation: eggRing .15s linear 8; } .egg-bell span { letter-spacing: .4em; font-weight: 700; } @keyframes eggRing { 50% { transform: rotate(8deg); } 0%, 100% { transform: rotate(-8deg); } }
+.egg-warp { position: fixed; inset: 0; z-index: 9500; width: 100vw; height: 100vh; pointer-events: none; }
+.egg-pizza { position: fixed; left: 0; right: 0; bottom: 0; height: 80px; z-index: 9450; pointer-events: none; overflow: hidden; } .egg-pizza span { position: absolute; bottom: 4px; left: -80px; animation: eggRoll 5s linear forwards; } @keyframes eggRoll { to { left: calc(100vw + 40px); transform: rotate(1080deg); } }
+.egg-dance { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 9450; display: flex; gap: 14px; pointer-events: none; } .egg-dance pre { margin: 0; font: 700 16px/1.1 monospace; text-shadow: 0 0 8px currentColor; }
+.egg-marq { position: fixed; left: 0; right: 0; top: 46px; z-index: 9450; overflow: hidden; background: rgba(2,14,8,.92); border-block: 1px solid #ff3d6e; color: #ff7aa0; font: 700 14px/30px monospace; pointer-events: none; } .egg-marq span { display: inline-block; white-space: nowrap; animation: eggMarq 8s linear forwards; } @keyframes eggMarq { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
+.egg-dust { position: fixed; inset: 0; z-index: 9450; pointer-events: none; } .egg-dust i { position: absolute; width: 4px; height: 4px; background: #00ff9c; opacity: 0; animation: eggDust 1.4s ease-in forwards; } @keyframes eggDust { 0% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.3); } }
+.egg-42 { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 9500; text-align: center; padding: 18px 30px; background: rgba(2,14,8,.97); border: 1px solid #00ff9c; color: #d6ffe9; } .egg-42 b { display: block; font-size: 80px; color: #00ff9c; text-shadow: 0 0 20px #00ff9c; } .egg-42 small, .egg-42 span { display: block; font-size: 11px; letter-spacing: .15em; color: #6fb08f; } .egg-42.out { opacity: 0; transition: opacity .5s; }
+.egg-dog { position: fixed; bottom: 40px; left: -100px; z-index: 9450; width: 90px; pointer-events: none; animation: eggDog 5s linear forwards; } .egg-dog svg { width: 90px; } .egg-dog em { position: absolute; top: -22px; left: 40px; font: 700 14px monospace; color: #ffd9a0; font-style: normal; opacity: 0; animation: eggBork 5s steps(1) forwards; }
+.egg-dog .d1 { animation: eggLegA .3s steps(1) infinite; } .egg-dog .d2 { animation: eggLegA .3s steps(1) infinite reverse; }
+@keyframes eggDog { to { left: calc(100vw + 20px); } } @keyframes eggLegA { 50% { opacity: 0; } } @keyframes eggBork { 40% { opacity: 1; } 55% { opacity: 0; } }
+/* panic + sleep */
+.egg-panic { position: fixed; inset: 0; z-index: 99999; background: #fff; color: #222; font: 12px Calibri, Arial, sans-serif; display: flex; flex-direction: column; cursor: default; }
+.pn-bar { background: #217346; color: #fff; padding: 6px 12px; } .pn-bar span { float: right; } .pn-fx { padding: 3px 10px; border-bottom: 1px solid #ccc; background: #f3f3f3; } .pn-wrap { flex: 1; overflow: hidden; } .egg-panic table { border-collapse: collapse; } .egg-panic th { background: #e6e6e6; border: 1px solid #ccc; font-weight: 400; padding: 2px 10px; min-width: 24px; } .egg-panic td { border: 1px solid #ddd; padding: 2px 10px; min-width: 90px; } .pn-tabs { padding: 4px 10px; background: #f3f3f3; border-top: 1px solid #ccc; } .pn-tabs i, .pn-tabs b { margin-right: 14px; font-style: normal; }
+.egg-sleep { position: fixed; inset: 0; z-index: 9200; pointer-events: none; background: rgba(10,4,0,var(--sl, .65)); } .egg-sleep button { pointer-events: auto; position: absolute; right: 12px; bottom: 44px; padding: 4px 10px; font: 11px monospace; color: #c9a36a; border: 1px solid #5b3a18; background: rgba(0,0,0,.6); }
+@media (prefers-reduced-motion: reduce) { .egg-pnl, .egg-bubble, .egg-term, .egg-kon, .egg-ball, .egg-ball i, .egg-spots { animation: none !important; } }

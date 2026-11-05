@@ -210,6 +210,173 @@
         $('.m-big', el).classList.toggle('hot', !!b && !b.charging && b.pct <= 15);
       },
     },
+    notes: {
+      // QUICK NOTE, three modes (the button cycles them, the choice is remembered):
+      //   LAST     edits the note you changed most recently, right here, in place
+      //   POPULAR  edits the note you've opened / saved the most in the last 36 hours
+      //   NEW      an empty box: saves into the page "Sidedock notes" (notebook Notes), new text under a dated line
+      // Usage log: localStorage "hs-notes-use" = { noteId: [timestamps] }, written here when a note is opened or saved.
+      // TODO (main notes view): append to the same key when a note is opened / saved there, so POPULAR sees it too.
+      title: 'QUICK NOTE',
+      mount(el) {
+        const MODES = ['last', 'popular', 'new'], LABEL = { last: 'LAST EDITED', popular: 'POPULAR · 36 H', new: 'NEW NOTE' }, WIN = 36 * 3600e3;
+        const st = { mode: (() => { try { const m = localStorage.getItem('dockNoteMode'); return MODES.includes(m) ? m : 'last'; } catch { return 'last'; } })(), id: null, dirty: false };
+        el.innerHTML = '<div class="m-h">✎ QUICK NOTE <em class="n-where"></em></div><div class="n-title"></div><textarea class="n-text" rows="3" placeholder="type a note…" spellcheck="true"></textarea><div class="m-btns"><button class="n-mode"></button><button class="n-save">SAVE</button></div><div class="m-sub n-msg"></div>';
+        const ta = $('.n-text', el), msg = $('.n-msg', el), where = $('.n-where', el), mode = $('.n-mode', el), ttl = $('.n-title', el);
+        const useGet = () => { try { return JSON.parse(localStorage.getItem('hs-notes-use') || '{}') || {}; } catch { return {}; } };
+        const useAdd = (id) => {
+          try {
+            const u = useGet(), now = Date.now(), cut = now - WIN;
+            for (const k of Object.keys(u)) { u[k] = (u[k] || []).filter((t) => t > cut); if (!u[k].length) delete u[k]; }
+            (u[id] = u[id] || []).push(now);
+            localStorage.setItem('hs-notes-use', JSON.stringify(u)); // local fallback only
+          } catch {}
+          hs.call('notesUse', id).catch(() => {}); // the real log lives in the main process (shared with the notes page)
+        };
+        const upd = (n) => (typeof n.updated === 'number' ? n.updated : Date.parse(n.updated) || 0);
+        const pick = async () => {
+          const l = (await hs.call('notesList')).filter((n) => !n.deleted && !n.journal);
+          if (!l.length) return null;
+          const newest = l.reduce((a, b) => (upd(b) > upd(a) ? b : a));
+          if (st.mode === 'last') return newest;
+          let u; try { u = (await hs.call('notesUseList')) || {}; } catch { u = useGet(); }
+          const cut = Date.now() - WIN;
+          const cnt = (n) => (u[n.id] || []).filter((t) => t > cut).length;
+          const ranked = l.map((n) => [n, cnt(n)]).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1] || upd(b[0]) - upd(a[0]));
+          return ranked.length ? ranked[0][0] : newest;
+        };
+        const fail = (e) => { msg.textContent = /locked|unlock/i.test(e.message) ? 'open HYPERSPACE once and type your password' : String(e.message).replace(/^Error invoking remote method '[^']*': (Error: )?/, ''); };
+        const label = async (force) => {
+          mode.textContent = `MODE: ${LABEL[st.mode]}`; mode.title = 'Click to switch: LAST EDITED, POPULAR, NEW NOTE';
+          try {
+            if (st.mode === 'new') {
+              where.textContent = 'NEW'; ttl.textContent = '→ page “Sidedock notes” (Notes)'; ta.placeholder = 'new text goes under a dated line…';
+              if (force) { ta.value = D.noteDraft || ''; st.dirty = !!ta.value; st.id = null; }
+              return;
+            }
+            ta.placeholder = 'type to edit this note…';
+            const n = await pick();
+            if (!n) { where.textContent = ''; ttl.textContent = 'no notes yet'; st.id = null; return; }
+            where.textContent = st.mode === 'last' ? 'LAST' : 'POPULAR';
+            ttl.textContent = `${n.title || 'Untitled'}  ·  ${[n.notebook, n.section].filter(Boolean).join(' › ')}`;
+            if (force || (!st.dirty && document.activeElement !== ta && n.id !== st.id)) {
+              const full = await hs.call('notesGet', n.id);
+              if (full) { ta.value = full.body || ''; st.dirty = false; }
+            }
+            if (n.id !== st.id) { st.id = n.id; useAdd(n.id); }
+          } catch { where.textContent = 'notes locked'; ttl.textContent = ''; }
+        };
+        mode.addEventListener('click', () => {
+          if (st.mode === 'new') D.noteDraft = ta.value;
+          st.mode = MODES[(MODES.indexOf(st.mode) + 1) % MODES.length]; st.dirty = false; st.id = null;
+          try { localStorage.setItem('dockNoteMode', st.mode); } catch {}
+          label(true);
+        });
+        const stamp = () => new Date().toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const save = async () => {
+          const text = ta.value.trim();
+          if (!text && st.mode === 'new') return;
+          try {
+            if (st.mode === 'new') {
+              const l = (await hs.call('notesList')).filter((n) => !n.deleted && !n.journal && n.title === 'Sidedock notes' && (n.notebook || 'Notes') === 'Notes');
+              const add = `**${stamp()}**\n${text}`;
+              if (l.length) {
+                const page = l.reduce((a, b) => (upd(b) > upd(a) ? b : a)), full = await hs.call('notesGet', page.id);
+                await hs.call('notesSave', { ...full, body: `${(full.body || '').replace(/\s+$/, '')}\n\n${add}\n` });
+                useAdd(page.id);
+              } else {
+                const r = await hs.call('notesSave', { title: 'Sidedock notes', notebook: 'Notes', section: '', body: `${add}\n` });
+                if (r?.id) useAdd(r.id);
+              }
+              ta.value = ''; D.noteDraft = ''; st.dirty = false; msg.textContent = 'added to “Sidedock notes” ✓';
+            } else {
+              if (!st.id) return;
+              const full = await hs.call('notesGet', st.id);
+              if (!full) throw new Error('that note is gone');
+              await hs.call('notesSave', { ...full, body: ta.value });
+              useAdd(st.id); st.dirty = false; msg.textContent = 'saved ✓';
+            }
+            setTimeout(() => { msg.textContent = ''; }, 3000); label();
+          } catch (e) { fail(e); }
+        };
+        $('.n-save', el).addEventListener('click', save);
+        ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); } });
+        ta.addEventListener('input', () => { st.dirty = true; if (st.mode === 'new') D.noteDraft = ta.value; });
+        // the dock normally ignores the keyboard; let it have it while this box is in use
+        ta.addEventListener('focus', () => hs.call('dockTyping', true));
+        ta.addEventListener('blur', () => hs.call('dockTyping', false));
+        el.addEventListener('mousedown', (e) => { if (e.target === ta) hs.call('dockTyping', true); });
+        label(true); el._label = () => label(false);
+      },
+      update(el) { const now = Date.now(); if (now - (el._lt || 0) > 20000) { el._lt = now; el._label?.(); } },
+    },
+    todo: {
+      // TO-DO: the top 5 open items of your personal list (todo.json, same file as the TO-DO page). Tick to finish, type to add.
+      title: 'TO-DO',
+      mount(el) {
+        el.innerHTML = '<div class="m-h m-link" title="Open the TO-DO page">✔ TO-DO <em class="t-n"></em></div><div class="m-list t-list"></div><input class="t-new" placeholder="add a to-do… (Enter)" spellcheck="true" /><div class="m-sub t-msg"></div>';
+        const list = $('.t-list', el), inp = $('.t-new', el);
+        const fresh = async () => { const s = await hs.call('todoGet'); return s && typeof s === 'object' ? s : { tasks: [] }; };
+        const refresh = async () => { try { D.todo = await fresh(); } catch {} render(); };
+        el._refresh = refresh;
+        $('.m-h', el).addEventListener('click', () => {
+          if (D.dragMoved) return;
+          try { localStorage.setItem('view', 'todo'); } catch {}
+          hs.call('dockOpenView', 'todo').catch(() => {}).finally(() => hs.call('dockSummon').catch(() => {}));
+        });
+        list.addEventListener('click', async (e) => {
+          const b = e.target.closest('[data-t]');
+          if (!b) return;
+          try {
+            const s = await fresh(), t = (s.tasks || []).find((x) => x.id === b.dataset.t);
+            if (t) { t.done = true; t.doneAt = Date.now(); await hs.call('todoSave', s); }
+          } catch {}
+          refresh();
+        });
+        const add = async () => {
+          const v = inp.value.trim();
+          if (!v) return;
+          try {
+            const s = await fresh(); s.tasks = s.tasks || [];
+            s.tasks.push({ id: Date.now().toString(36), text: v, done: false, at: Date.now() });
+            await hs.call('todoSave', s); inp.value = '';
+          } catch { $('.t-msg', el).textContent = 'could not save'; }
+          refresh();
+        };
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+        inp.addEventListener('focus', () => hs.call('dockTyping', true));
+        inp.addEventListener('blur', () => hs.call('dockTyping', false));
+        el.addEventListener('mousedown', (e) => { if (e.target === inp) hs.call('dockTyping', true); });
+        refresh();
+      },
+      update(el) {
+        const open = (D.todo?.tasks || []).filter((t) => !t.done);
+        $('.t-n', el).textContent = D.todo ? `${open.length} OPEN` : '';
+        // the header pulses amber when an item is past its due date, or when more than 8 items are open
+        $('.m-h', el)?.classList.toggle('pulse-warn', open.length > 8 || open.some((t) => t.due && new Date(t.due).getTime() < Date.now()));
+        const html = open.slice(0, 5).map((t) => `<div class="t-row"><button data-t="${esc(t.id)}" title="Tick it off">☐</button><span title="${esc(t.text)}">${esc(t.text)}</span></div>`).join('') || '<div class="m-sub">nothing open ✓</div>';
+        const l = $('.t-list', el);
+        if (l._h !== html) { l._h = html; l.innerHTML = html; }
+      },
+    },
+    vacuum: {
+      title: 'MEMORY VACUUM',
+      mount(el) {
+        el.innerHTML = '<div class="m-h">⌬ VACUUM <em></em></div><div class="m-btns"><button class="vc-go" title="Frees RAM: empties standby memory and trims idle apps (needs HyperCore running as admin)">CLEAN RAM</button></div><div class="m-sub vc-msg">click to free memory</div>';
+        const b = $('.vc-go', el), msg = $('.vc-msg', el);
+        b.addEventListener('click', async () => {
+          if (b.disabled) return;
+          b.disabled = true; b.textContent = 'CLEANING…'; msg.textContent = '';
+          try {
+            const r = await core('mem.run', { trim: true });
+            const freed = r.availableAfter - r.availableBefore;
+            msg.textContent = freed > 0 ? `freed ${bytes(freed)}${r.trimmed ? ` · ${r.trimmed} apps trimmed` : ''}` : 'nothing more to free';
+          } catch (e) { msg.textContent = String(e?.message || e).replace(/^Error invoking remote method '[^']*': (Error: )?/, '').slice(0, 80); }
+          b.disabled = false; b.textContent = 'CLEAN RAM';
+        });
+      },
+      update(el) { const m = D.perf?.mem; if (m) $('em', el).textContent = `${bytes(m.total - m.used)} free`; },
+    },
     uptime: {
       title: 'UPTIME',
       mount(el) { el.innerHTML = '<div class="m-h">⏱ UPTIME</div><div class="m-big"></div><div class="m-sub">since the last restart</div>'; },
@@ -248,6 +415,83 @@
       try { MODS[id]?.update(el); } catch {}
     }
   }
+
+  // ---------------- drag a module to reorder: press and hold its header (or move 6 px), drop where you want it ----------------
+  // Pointer events with capture on the header, so it works in this non-focusable window. The other modules slide
+  // aside with a transform transition; the amber line shows where it will land. The order is saved via dockSet.
+  (() => {
+    const box = $('#sd-mods'), GAP = 8;
+    let g = null;
+    const mods = () => [...box.children].filter((c) => c.classList.contains('m'));
+    const idOf = (el) => [...el.classList].find((c) => c.startsWith('m-') && MODS[c.slice(2)])?.slice(2);
+    const place = (y) => {
+      const mid = g.items.map((r) => r.top + r.h / 2), c = g.top + g.h / 2 + (y - g.y0);
+      let to = 0;
+      g.items.forEach((r, i) => { if (i !== g.from && mid[i] < c) to++; });
+      g.to = to;
+      const step = g.h + GAP;
+      g.items.forEach((r, i) => {
+        if (i === g.from) return;
+        let dy = 0;
+        if (to > g.from && i > g.from && i <= to) dy = -step;
+        if (to < g.from && i >= to && i < g.from) dy = step;
+        g.els[i].style.transform = dy ? `translateY(${dy}px)` : '';
+      });
+      // marker where it will land
+      const slot = to > g.from ? g.items[to].top + g.items[to].h - g.h : g.items[to].top;
+      g.mark.style.top = `${Math.max(0, slot - GAP / 2 - 1)}px`;
+    };
+    const lift = (e) => {
+      const els = mods(), from = els.indexOf(g.el);
+      Object.assign(g, { els, from, items: els.map((m) => ({ top: m.offsetTop, h: m.offsetHeight })), to: from });
+      g.top = g.items[from].top; g.h = g.items[from].h;
+      g.mark = document.createElement('div'); g.mark.className = 'dk-mark'; box.append(g.mark);
+      g.el.classList.add('lifted'); box.classList.add('reordering');
+      g.lifted = true; D.dragMoved = true;
+      g.y0 = e.clientY - (box.scrollTop - g.scroll0);
+      place(e.clientY);
+    };
+    const finish = async (commit) => {
+      if (!g) return;
+      clearTimeout(g.timer);
+      const was = g;
+      g = null;
+      try { was.head.releasePointerCapture(was.pid); } catch {}
+      if (was.lifted) {
+        was.el.classList.remove('lifted'); box.classList.remove('reordering'); was.mark?.remove();
+        was.els.forEach((m) => { m.style.transform = ''; });
+        if (commit && was.to !== was.from) { was.el.classList.remove('settle'); void was.el.offsetWidth; was.el.classList.add('settle'); setTimeout(() => was.el.classList.remove('settle'), 600); } // small settle bounce (the dock has no rabbit)
+        setTimeout(() => { D.dragMoved = false; }, 0);
+        if (commit && was.to !== was.from) {
+          const arr = was.els.slice(); arr.splice(was.from, 1); arr.splice(was.to, 0, was.el);
+          arr.forEach((m) => box.append(m));
+          const next = [...arr.map(idOf), ...(cfg.modules || []).filter((m) => !MODS[m])];
+                    cfg.modules = next; key = JSON.stringify([cfg.modules, cfg.opacity]); // same layout as what the app will push back: no rebuild
+          try { await hs.call('dockSet', { modules: next }); } catch {}
+        }
+      }
+    };
+    box.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || g || dragging) return;
+      const head = e.target.closest('.m-h');
+      if (!head || e.target.closest('button, textarea, input, select, a')) return;
+      const el = head.closest('.m');
+      if (!el) return;
+      g = { el, head, pid: e.pointerId, x0: e.clientX, y0: e.clientY, scroll0: box.scrollTop, lifted: false };
+      try { head.setPointerCapture(e.pointerId); } catch {}
+      g.timer = setTimeout(() => { if (g && !g.lifted) lift({ clientY: g.y0 }); }, 250);
+    });
+    box.addEventListener('pointermove', (e) => {
+      if (!g || e.pointerId !== g.pid) return;
+      if (!g.lifted) { if (Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < 6) return; clearTimeout(g.timer); lift({ clientY: g.y0 }); }
+      const dy = e.clientY - g.y0 + (box.scrollTop - g.scroll0);
+      g.el.style.transform = `translateY(${dy}px)`;
+      place(e.clientY);
+    });
+    box.addEventListener('pointerup', (e) => { if (g && e.pointerId === g.pid) finish(true); });
+    box.addEventListener('pointercancel', () => finish(false));
+    window.addEventListener('blur', () => finish(false));
+  })();
 
   // ---------------- slide out / back (auto mode) ----------------
   // the app watches the cursor and says when to slide out / away
@@ -305,6 +549,7 @@
     if (want('media')) core('media.get').then((m) => { D.media = m; }).catch(() => {});
     if (want('shield')) hs.call('hwState').then((h) => { D.hw = h; }).catch(() => {});
     if (want('apps')) hs.call('procs').then((p) => { D.procs = p; }).catch(() => {});
+    if (want('todo')) hs.call('todoGet').then((t) => { D.todo = t || { tasks: [] }; }).catch(() => {});
     if (want('volume')) core('audio.getVolume').then((v) => { D.vol = v; }).catch(() => {});
   }
   setInterval(slowPoll, 3000);

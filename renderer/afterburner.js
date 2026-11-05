@@ -376,6 +376,7 @@
     const p = coolPreset();
     $$('#cool-presets button').forEach((b) => b.classList.toggle('on', b.dataset.p === p));
     $('#cool-mode').textContent = { auto: 'AUTO', max: 'MAX', quiet: 'QUIET', balanced: 'BALANCED', aggressive: 'COOL', custom: 'YOUR OWN CURVE', manual: 'SET BY HAND' }[p] || '—';
+    renderFp();
     if (document.activeElement?.id !== 'cool-mc' && document.activeElement?.id !== 'cool-mg') {
       const c = flat(curves.cpu), g = flat(curves.gpu);
       $('#cool-mc').value = c ?? 30; $('#cool-mcv').textContent = c != null && fanMode === 'curve' ? `${c}%` : '—';
@@ -395,6 +396,103 @@
     markCool();
     toast(`COOLING → ${b.querySelector('b').textContent}`);
   });
+  // ---------------- FAN PRESETS: QUIET / BALANCED / LOUD / GAMING BOOST + your own saved curves ----------------
+  // Everything goes through the paths above (curves + pushFans for the fans, power.set for the thermal profile);
+  // nothing new touches hardware. Before a preset is applied the current state is kept so REVERT can put it back.
+  const clamp100 = (c, add) => c.map(([t, p]) => [t, Math.max(0, Math.min(100, p + add))]);
+  const fpBase = (k) => status?.curves?.[k];
+  const FP_BUILT = [
+    { id: 'b-quiet', name: 'QUIET', sub: 'low fans, quiet profile', get: () => fpBase('quiet') && { cpu: fpBase('quiet').cpu, gpu: fpBase('quiet').gpu, profile: 'quiet' } },
+    { id: 'b-balanced', name: 'BALANCED', sub: 'everyday curve', get: () => fpBase('balanced') && { cpu: fpBase('balanced').cpu, gpu: fpBase('balanced').gpu, profile: 'balanced' } },
+    { id: 'b-loud', name: 'LOUD', sub: 'cool curve +10%, performance profile', get: () => fpBase('aggressive') && { cpu: clamp100(fpBase('aggressive').cpu, 10), gpu: clamp100(fpBase('aggressive').gpu, 10), profile: 'performance' } },
+    { id: 'b-boost', name: 'GAMING BOOST', sub: 'cool curve +25%, turbo profile', get: () => fpBase('aggressive') && { cpu: clamp100(fpBase('aggressive').cpu, 25), gpu: clamp100(fpBase('aggressive').gpu, 25), profile: 'turbo' } },
+  ];
+  const fpEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fpHost = $('.ab-cool');
+  const fpBox = document.createElement('div');
+  fpBox.className = 'fp-box';
+  fpBox.innerHTML = '<div class="fp-head"><b>FAN PRESETS</b><span id="fp-active" class="fp-active"></span><button class="chip mini" id="fp-revert" disabled title="Put the fans and thermal profile back how they were before the last preset">REVERT</button><button class="chip mini" id="fp-save" title="Save the current curves as your own preset">SAVE CURRENT</button></div><div class="fp-list" id="fp-list"></div><div class="fp-note dim">Right-click one of your own presets to rename or delete it. Presets only use the fan curve and thermal profile controls above.</div>';
+  fpHost?.appendChild(fpBox);
+  let fpSig = '';
+  const fpMine = () => (Array.isArray(HS.config.fanPresets) ? HS.config.fanPresets : []);
+  const fpAll = () => [...FP_BUILT.map((p) => ({ ...p, built: true, data: p.get() })), ...fpMine().map((p) => ({ id: p.id, name: p.name, sub: 'saved curve', data: p }))];
+  function fpActive() {
+    const a = HS.config.fanActive;
+    if (!a || fanMode !== 'curve' || !same(a.cpu, curves.cpu) || !same(a.gpu, curves.gpu)) return null;
+    return a;
+  }
+  function renderFp() {
+    const a = fpActive(), prev = HS.config.fanActive?.prev;
+    const sig = JSON.stringify([a?.id, !!prev, fpMine(), !!status]);
+    if (sig === fpSig) return;
+    fpSig = sig;
+    $('#fp-list').innerHTML = fpAll().map((p) => `<button data-id="${fpEsc(p.id)}" class="${a?.id === p.id ? 'on' : ''}" ${p.data ? '' : 'disabled'}><b>${fpEsc(p.name)}</b><span>${fpEsc(p.sub)}</span>${a?.id === p.id ? '<i>ACTIVE</i>' : ''}</button>`).join('');
+    $('#fp-active').textContent = a ? `ACTIVE PRESET: ${a.name}` : 'no preset active';
+    $('#fp-revert').disabled = !(a && a.prev);
+  }
+  async function applyFp(p) {
+    if (!HS.core.elevated) return HS.askAdmin('Fan control');
+    if (!p.data) return toast('FAN PRESETS AREN\'T LOADED YET', true);
+    const prev = { mode: fanMode, cpu: curves.cpu.map((x) => [...x]), gpu: curves.gpu.map((x) => [...x]), profile: power?.acerProfile ?? null };
+    curves = { cpu: p.data.cpu.map((x) => [...x]), gpu: p.data.gpu.map((x) => [...x]) };
+    fanMode = 'curve';
+    await pushFans();
+    if (p.data.profile && power && power.acerProfile !== p.data.profile) {
+      try { const r = await coreCall('power.set', { key: 'acerProfile', value: p.data.profile }); power = r.state; renderPower(); } catch { /* profile refused: the curve still applies */ }
+    }
+    HS.saveConfig({ fanActive: { id: p.id, name: p.name, cpu: curves.cpu, gpu: curves.gpu, prev } });
+    markCool();
+    toast(`FAN PRESET → ${p.name}`);
+  }
+  async function revertFp() {
+    const prev = HS.config.fanActive?.prev;
+    if (!prev) return;
+    if (prev.mode === 'curve') { curves = { cpu: prev.cpu, gpu: prev.gpu }; fanMode = 'curve'; await pushFans(); }
+    else await setFanMode(prev.mode);
+    if (prev.profile && power && power.acerProfile !== prev.profile) {
+      try { const r = await coreCall('power.set', { key: 'acerProfile', value: prev.profile }); power = r.state; renderPower(); } catch {}
+    }
+    HS.saveConfig({ fanActive: null });
+    markCool();
+    toast('FANS REVERTED TO BEFORE THE PRESET');
+  }
+  // the browser prompt() doesn't exist in Electron: a small name box under the header instead
+  function fpAsk(def, done) {
+    fpBox.querySelector('.fp-ask')?.remove();
+    const row = document.createElement('div');
+    row.className = 'fp-ask';
+    row.innerHTML = '<input maxlength="24" /><button class="chip mini">OK</button><button class="chip mini" data-x="1">CANCEL</button>';
+    const inp = row.querySelector('input');
+    inp.value = def;
+    fpBox.querySelector('.fp-head').after(row);
+    inp.focus(); inp.select();
+    const go = () => { const n = inp.value.trim().slice(0, 24).toUpperCase(); row.remove(); if (n) done(n); };
+    row.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.x) row.remove(); else go(); });
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); if (e.key === 'Escape') row.remove(); });
+  }
+  fpBox.addEventListener('click', (e) => {
+    if (e.target.closest('.fp-ask')) return;
+    if (e.target.id === 'fp-revert') return revertFp();
+    if (e.target.id === 'fp-save') {
+      fpAsk(`MY CURVE ${fpMine().length + 1}`, (name) => {
+      HS.saveConfig({ fanPresets: [...fpMine(), { id: `u-${Date.now()}`, name, cpu: curves.cpu.map((x) => [...x]), gpu: curves.gpu.map((x) => [...x]), profile: power?.acerProfile ?? null }] });
+      fpSig = ''; renderFp(); toast(`SAVED · ${name}`);
+      });
+      return;
+    }
+    const b = e.target.closest('#fp-list button');
+    if (b) applyFp(fpAll().find((p) => p.id === b.dataset.id));
+  });
+  fpBox.addEventListener('contextmenu', (e) => {
+    const b = e.target.closest('#fp-list button');
+    const mine = b && fpMine().find((p) => p.id === b.dataset.id);
+    if (!mine) return;
+    window.hsMenu?.(e, [
+      { label: 'Rename', run: () => fpAsk(mine.name, (n) => { HS.saveConfig({ fanPresets: fpMine().map((p) => (p.id === mine.id ? { ...p, name: n } : p)) }); fpSig = ''; renderFp(); }) },
+      { label: 'Delete', danger: true, run: () => { HS.saveConfig({ fanPresets: fpMine().filter((p) => p.id !== mine.id) }); fpSig = ''; renderFp(); } },
+    ], mine.name);
+  });
+
   $('#cool-adv').addEventListener('click', () => {
     const adv = $('.ab-fans');
     adv.classList.toggle('hidden');

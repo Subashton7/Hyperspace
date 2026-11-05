@@ -83,3 +83,5 @@
 .sp-rec th, .sp-rec td { border: 1px solid var(--panel-edge); padding: 5px 9px; text-align: center; }
 .sp-rec th { font: 500 9px var(--display); letter-spacing: 1px; color: var(--g-mid); }
 .sp-sum-box { overflow-x: auto; }
+#gm-back { position: fixed; top: 10px; right: 16px; z-index: 30; }
+#gm-back[hidden] { display: none; }

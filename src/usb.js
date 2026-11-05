@@ -3,6 +3,8 @@
 // "companions"; on this laptop the USB-C socket's two halves even sit on different controllers), and a USB 3 hub
 // likewise shows up twice. Both get merged back into one socket / one hub here.
 const { execFile } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const VOLTS = 5; // USB devices ask for current at 5 V
 const SUPPLY = { 'USB-C': 3000, 'USB-A 3': 900, 'USB-A 2': 500 }; // what a socket is meant to supply, mA
@@ -109,4 +111,43 @@ async function usbTree(exe) {
   return t;
 }
 
-module.exports = { usbTree, build };
+// ---------- USB HISTORY: every device ever seen on the ports (local file only, never sent anywhere) ----------
+// key = vendor:product (+ serial number when the device has a real one), so a stick moved between sockets is the same device.
+class UsbHistory {
+  constructor(dir) {
+    this.file = path.join(dir, 'usb-history.json');
+    this.map = {};
+    this.seeded = false;
+    try { this.map = JSON.parse(fs.readFileSync(this.file, 'utf8')) || {}; this.seeded = Object.keys(this.map).length > 0; } catch {}
+  }
+  static key(d) {
+    const serial = String(d.id || '').split('\\').pop();
+    return `${d.vid}:${d.pid}${serial && !serial.includes('&') && serial !== d.id ? `:${serial}` : ''}`;
+  }
+  // tree = a usbTree() result. Returns the devices never seen before (empty on the very first read: that one only sets the baseline).
+  record(tree) {
+    const now = Date.now(), here = new Map(), fresh = [];
+    const walk = (d, sock, trail) => {
+      if (!d || !d.vid) return;
+      const k = UsbHistory.key(d);
+      here.set(k, { d, sockId: sock.id, sockLabel: sock.label, trail: trail.join(' → ') });
+      (d.hub?.ports || []).forEach((p) => walk(p.device, sock, [...trail, `hub port ${p.port}`]));
+    };
+    for (const s of tree.sockets || []) walk(s.device, s, []);
+    for (const [k, h] of here) {
+      const title = h.d.product && !/^usbd|hub$/i.test(h.d.product) && /composite|^generic|^usb (input|device)/i.test(h.d.name) ? h.d.product : h.d.name;
+      let e = this.map[k];
+      if (!e) { e = this.map[k] = { name: title, vid: h.d.vid, pid: h.d.pid, maker: h.d.maker || '', first: now, count: 1, on: true }; if (this.seeded) fresh.push({ key: k, ...e }); }
+      else if (!e.on) e.count++;
+      e.name = title; e.last = now; e.on = true; e.sockId = h.sockId; e.sockLabel = h.sockLabel; e.trail = h.trail; e.hub = !!h.d.isHub;
+    }
+    for (const [k, e] of Object.entries(this.map)) if (!here.has(k)) e.on = false;
+    this.seeded = true;
+    this.save();
+    return fresh;
+  }
+  list() { return Object.entries(this.map).map(([key, e]) => ({ key, ...e })).sort((a, b) => (b.last || 0) - (a.last || 0)); }
+  save() { try { fs.writeFileSync(this.file, JSON.stringify(this.map)); } catch {} }
+}
+
+module.exports = { usbTree, build, UsbHistory };

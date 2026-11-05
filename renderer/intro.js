@@ -1,5 +1,6 @@
-// HYPERSPACE boot sequence (~6 s, click or any key skips):
-//   signal -> matrix rain -> vortex -> ignition -> sacred geometry bloom -> title decode -> warp into the UI.
+// HYPERSPACE boot sequence (~7.4 s, click or any key skips):
+//   Om / trident / wheel of samsara glitch out of the rain -> an emblem of sacred geometry is assembled piece by piece from
+//   falling glyphs -> ignition + bloom -> title decode -> warp into the UI.
 // Sound is synthesized with Web Audio (no files). Mode: full | silent | off (localStorage 'intro').
 (() => {
   const TAU = Math.PI * 2;
@@ -9,9 +10,10 @@
   const titleEl = root.querySelector('.intro-title');
   const mainEl = root.querySelector('.it-main');
   const subEl = root.querySelector('.it-sub');
-  const GLYPHS = 'ï½±ï½²ï½³ï½´ï½µï½¶ï½·ï½¸ï½¹ï½ºï½»ï½¼ï½½ï½¾ï½¿ï¾€ï¾ï¾‚ï¾ƒï¾„ï¾…ï¾†ï¾‡ï¾ˆï¾‰ï¾Šï¾‹ï¾Œï¾ï¾Žï¾ï¾ï¾‘ï¾’ï¾“ï¾”ï¾•ï¾–ï¾—ï¾˜ï¾™ï¾šï¾›ï¾œï¾0123456789â˜‰â˜½âœ¡âš›â–³â–½â—¬âŸâŒ¬â£â˜âœºâŠ›à¥';
+  const GLYPHS = Array.from({ length: 46 }, (_, i) => String.fromCharCode(0xFF71 + i)).join('') + '0123456789\u2609\u263D\u2721\u269B\u25B3\u25BD\u25EC\u232C\u2742\u229B';
   const TITLE = 'HYPERSPACE';
-  const T = { rain: 0.4, vortex: 1.6, ignite: 2.8, title: 3.3, warp: 4.6, end: 5.9 };
+  // emblem = 'sigil' of sacred geometry. Symbols (Om, trident, wheel) 0-2.7 s, emblem assembles from the rain to ignition
+  const T = { rain: 0.15, vortex: 2.7, ignite: 4.7, title: 5.2, drain: 6.2, warp: 6.5, end: 7.4 };
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const glyph = () => GLYPHS[(Math.random() * GLYPHS.length) | 0];
@@ -26,7 +28,7 @@
   if (/[?&]intro=silent/.test(location.search) && mode === 'full') mode = 'silent'; // test captures
 
   let raf = 0, running = false, audio = null, W = 0, H = 0, S = 0, k = 1;
-  let cols = [], vortex = null, sparks = null, start = 0;
+  let cols = [], sparks = null, start = 0;
 
   // ---------------- sound ----------------
   function sound() {
@@ -135,6 +137,177 @@
     };
   }
 
+  // ---------------- shapes: Om, trident, wheel of samsara, and the HYPERSPACE emblem ----------------
+  // Everything is drawn procedurally (no fonts, no images). A "group" is a set of polylines. Each group is shown two
+  // ways at once: falling green glyphs that land on the lines, and the sharp luminous line art that comes into focus
+  // out of a glitch (colour-split, jittering) as the glyphs settle.
+  const fxHigh = () => document.body.dataset.fx === 'high';
+  const COL = [[0, 255, 110], [80, 240, 255], [255, 120, 190], [150, 90, 255], [234, 255, 239]]; // green, cyan, pink, purple, white
+  let syms = [], symO = [], emb = [], embO = [], AM = 1;
+
+  const bez = (a, b, c, d, n = 22) => {
+    const o = [];
+    for (let i = 0; i <= n; i++) {
+      const u = i / n, v = 1 - u;
+      o.push([v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]]);
+    }
+    return o;
+  };
+  const circ = (cx, cy, r, a0 = 0, a1 = TAU, n = 56) => Array.from({ length: n + 1 }, (_, i) => [cx + Math.cos(a0 + ((a1 - a0) * i) / n) * r, cy + Math.sin(a0 + ((a1 - a0) * i) / n) * r]);
+  const P = (p, c = 0, a = 1, w = 1.6, np = false) => ({ p, c, a, w, np });
+
+  function omPolys() {
+    const body = [].concat(
+      bez([-0.55, -0.4], [-0.25, -0.75], [0.25, -0.65], [0.12, -0.3]),
+      bez([0.12, -0.3], [0.04, -0.1], [-0.15, -0.05], [-0.32, -0.05]),
+      bez([-0.32, -0.05], [0.2, -0.1], [0.62, 0.05], [0.52, 0.42]),
+      bez([0.52, 0.42], [0.42, 0.82], [-0.2, 0.85], [-0.5, 0.6]),
+      bez([-0.5, 0.6], [-0.68, 0.42], [-0.5, 0.22], [-0.3, 0.3]));
+    return [P(body, 0, 1, 3.2), P(bez([0.15, -0.28], [0.4, -0.25], [0.7, -0.3], [0.66, 0.0]), 0, 1, 3.2),
+      P(circ(0.42, -0.64, 0.2, 0.1 * Math.PI, 0.9 * Math.PI, 20), 2, 1, 3.2), P(circ(0.42, -0.72, 0.04, 0, TAU, 12), 1, 1, 4)];
+  }
+  function tridentPolys() {
+    const shaft = [[0, -0.62], [0, 0.95]];
+    const U = bez([-0.5, -0.62], [-0.5, -0.1], [-0.36, 0.08], [0, 0.08], 18).concat(bez([0, 0.08], [0.36, 0.08], [0.5, -0.1], [0.5, -0.62], 18));
+    const head = (x) => [[x - 0.09, -0.5], [x, -0.82], [x + 0.09, -0.5], [x, -0.58], [x - 0.09, -0.5]];
+    return [P(shaft, 0, 1, 3.2), P(U, 1, 1, 3.2), P(head(-0.5), 2, 1, 3), P(head(0), 2, 1, 3), P(head(0.5), 2, 1, 3),
+      P([[-0.14, 0.2], [0.14, 0.2]], 0, 1, 3), P([[-0.1, 0.34], [0.1, 0.34]], 0, 0.8, 3), P([[-0.07, 0.95], [0, 1.05], [0.07, 0.95]], 0, 1, 3)];
+  }
+  function wheelPolys() {
+    const o = [P(circ(0, 0, 0.88), 0, 1, 3.2), P(circ(0, 0, 0.78), 1, 0.7, 2), P(circ(0, 0, 0.17), 3, 1, 3), P(circ(0, 0, 0.07, 0, TAU, 20), 4, 1, 3.5)];
+    for (let i = 0; i < 8; i++) {
+      const a = (i * TAU) / 8, c = Math.cos(a), s = Math.sin(a);
+      o.push(P([[c * 0.17, s * 0.17], [c * 0.78, s * 0.78]], 1, 1, 3));
+      o.push(P(circ(c * 0.96, s * 0.96, 0.06, 0, TAU, 14), 2, 1, 3));
+    }
+    return o;
+  }
+  function emblemParts() {
+    const ring = [P(circ(0, 0, 1, 0, TAU, 96), 0, 1, 2.4), P(circ(0, 0, 1.07, 0, TAU, 96), 1, 0.7, 1.2)];
+    for (let i = 0; i < 72; i++) { const a = (i / 72) * TAU, c = Math.cos(a), s = Math.sin(a), l = i % 6 === 0 ? 0.1 : 0.04; ring.push(P([[c * 1.09, s * 1.09], [c * (1.09 + l), s * (1.09 + l)]], i % 6 === 0 ? 2 : 0, 0.8, 1.2, true)); }
+    const r = 1 / 3, petals = [P(circ(0, 0, r), 0, 1, 1.6)];
+    for (let i = 0; i < 6; i++) {
+      const a = (i * TAU) / 6, b = ((i + 1) * TAU) / 6;
+      petals.push(P(circ(Math.cos(a) * r, Math.sin(a) * r, r), 0, 0.9, 1.6));
+      petals.push(P(circ(Math.cos(a) * 2 * r, Math.sin(a) * 2 * r, r), 3, 0.85, 1.4));
+      petals.push(P(circ((Math.cos(a) + Math.cos(b)) * r, (Math.sin(a) + Math.sin(b)) * r, r), 0, 0.5, 1.2));
+    }
+    const R2 = 0.82, tri = (a0, c) => P(Array.from({ length: 4 }, (_, i) => [Math.cos(a0 + (i * TAU) / 3) * R2, Math.sin(a0 + (i * TAU) / 3) * R2]), c, 1, 2.2);
+    const star = [tri(-Math.PI / 2, 1), tri(Math.PI / 2, 2),
+      P(Array.from({ length: 7 }, (_, i) => [Math.cos(-Math.PI / 3 + (i * TAU) / 6) * R2 / 1.732, Math.sin(-Math.PI / 3 + (i * TAU) / 6) * R2 / 1.732]), 0, 0.7, 1.4)];
+    for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i * TAU) / 6; star.push(P([[Math.cos(a) * 0.12, Math.sin(a) * 0.12], [Math.cos(a) * R2, Math.sin(a) * R2]], 0, 0.35, 1, true)); }
+    const eyeTop = bez([-0.3, 0], [-0.1, -0.3], [0.1, -0.3], [0.3, 0]), eyeBot = bez([-0.3, 0], [-0.1, 0.3], [0.1, 0.3], [0.3, 0]);
+    const hub = [P(circ(0, 0, 0.32, 0, TAU, 48), 0, 0.5, 1.2), P(eyeTop, 4, 1, 2), P(eyeBot, 4, 1, 2), P(circ(0, 0, 0.1, 0, TAU, 28), 1, 1, 2.2), P(circ(0, 0, 0.04, 0, TAU, 16), 4, 1, 3.5)];
+    return [ring, petals, star, hub];
+  }
+
+  // turn polylines (unit coords) into a drawable group: one Path2D per style, plus glyph particles along the lines
+  function buildGroup(polys, sc, maxN, rot) {
+    const hi = fxHigh(), cls = {}, scaled = [];
+    let total = 0;
+    for (const o of polys) {
+      const p = o.p.map(([x, y]) => [x * sc, y * sc]);
+      const key = `${o.c}|${o.a}|${o.w}`;
+      const c = cls[key] || (cls[key] = { c: o.c, a: o.a, w: o.w, path: new Path2D() });
+      c.path.moveTo(p[0][0], p[0][1]);
+      for (let i = 1; i < p.length; i++) c.path.lineTo(p[i][0], p[i][1]);
+      if (o.np) continue;
+      scaled.push(p);
+      for (let i = 1; i < p.length; i++) total += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]);
+    }
+    const sp = Math.max(9 * k * (hi ? 1 : 1.8), total / (hi ? maxN : maxN * 0.55)), pts = [];
+    for (const p of scaled) {
+      let carry = 0;
+      for (let i = 1; i < p.length; i++) {
+        const dx = p[i][0] - p[i - 1][0], dy = p[i][1] - p[i - 1][1], L = Math.hypot(dx, dy);
+        if (!L) continue;
+        for (let d = sp - carry; d <= L; d += sp) pts.push({ x: p[i - 1][0] + (dx * d) / L, y: p[i - 1][1] + (dy * d) / L, ch: glyph(), d: Math.random(), fall: H * (0.6 + Math.random() * 0.5), cx: 0, cy: 0, arr: true });
+        carry = (carry + L) % sp;
+      }
+    }
+    return { cls: Object.values(cls), pts, rot };
+  }
+
+  const emblemRot = (t) => (t > T.ignite ? (t - T.ignite) * 0.3 : 0) + easeIn(seg(t, T.warp, T.end)) * 5;
+  function buildShapes() {
+    const sz = S * 0.2, R = S * 0.3;
+    syms = [buildGroup(omPolys(), sz, 170, null), buildGroup(tridentPolys(), sz, 170, null), buildGroup(wheelPolys(), sz, 190, (t) => (t - 1.8) * 0.9)];
+    symO = [0.1, 0.95, 1.8].map((s) => ({ t0: s, dur: 0.62, sIn0: s + 0.12, sIn1: s + 0.6, sOut: s + 0.74, sOutLen: 0.12, gFade: s + 0.72, gLen: 0.25, fall: true }));
+    const parts = emblemParts(), caps = [130, 260, 150, 70];
+    emb = parts.map((pl, i) => buildGroup(pl, R, caps[i], i === 2 ? (t) => emblemRot(t) - (t > T.ignite ? (t - T.ignite) * 0.55 : 0) : emblemRot));
+    const wins = [[T.vortex, 0.7], [T.vortex + 0.45, 0.8], [T.vortex + 1.0, 0.7], [T.vortex + 1.5, 0.5]];
+    const flash = (t) => (t >= T.ignite ? Math.exp(-(t - T.ignite) * 5) : 0);
+    embO = wins.map(([a, d]) => ({ t0: a, dur: d, sIn0: a + d * 0.7, sIn1: a + d + 0.2, sOut: 1e9, sOutLen: 1, gFade: a + d, gLen: 0.35, fall: false, flash }));
+  }
+
+  function drawGroup(g, t, o) {
+    const gl = 1 - seg(t, o.sIn0, o.sIn1);
+    const sa = seg(t, o.sIn0, o.sIn1 + 0.05) * (1 - seg(t, o.sOut, o.sOut + o.sOutLen)) * AM;
+    const ga = (1 - seg(t, o.gFade, o.gFade + o.gLen)) * AM;
+    const showG = t > o.t0 && ga > 0.01, showS = sa > 0.01;
+    if (!showG && !showS) return;
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    if (g.rot) ctx.rotate(g.rot(t));
+    if (showG) {
+      ctx.font = `${(14 * k).toFixed(1)}px "Share Tech Mono", monospace`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const A = o.dur * 0.55, w = o.fall ? seg(t, o.gFade, o.gFade + o.gLen) : 0;
+      for (const p of g.pts) {
+        if (Math.random() < 0.22) p.ch = glyph();
+        const u = easeOut(clamp01((t - o.t0 - p.d * o.dur * 0.45) / A));
+        p.cx = p.x; p.cy = p.y - p.fall * (1 - u) + w * w * H * 0.5 * (0.4 + p.d); p.arr = u < 0.97;
+      }
+      ctx.fillStyle = 'rgb(220,255,232)'; ctx.globalAlpha = ga * 0.9;
+      for (const p of g.pts) if (p.arr) ctx.fillText(p.ch, p.cx, p.cy);
+      ctx.fillStyle = 'rgb(0,255,110)'; ctx.globalAlpha = ga * 0.7;
+      for (const p of g.pts) if (!p.arr) ctx.fillText(p.ch, p.cx, p.cy);
+    }
+    if (showS) {
+      const hi = fxHigh(), fl = o.flash ? o.flash(t) : 0;
+      ctx.lineJoin = ctx.lineCap = 'round';
+      ctx.globalAlpha = 1;
+      const pass = (dx, a, wm, col) => {
+        if (dx) ctx.translate(dx, 0);
+        for (const c of g.cls) {
+          const q = col || COL[c.c];
+          ctx.strokeStyle = `rgba(${q[0]},${q[1]},${q[2]},${Math.min(1, a * c.a).toFixed(3)})`;
+          ctx.lineWidth = c.w * k * wm; ctx.stroke(c.path);
+        }
+        if (dx) ctx.translate(-dx, 0);
+      };
+      if (hi) pass(0, sa * 0.14, 4.5);
+      if (gl > 0.05) {
+        if (hi) { pass(-gl * 16 * k, sa * 0.45, 1, COL[2]); pass(gl * 16 * k, sa * 0.45, 1, COL[1]); }
+        if (Math.random() > gl * 0.55) pass((Math.random() - 0.5) * gl * 20 * k, sa, 1);
+      } else pass(0, sa, 1);
+      if (fl > 0.02) pass(0, fl * sa * 0.8, 1.6, COL[4]);
+    }
+    ctx.restore();
+  }
+
+  function drawSymbols(t) { for (let i = 0; i < syms.length; i++) if (t < symO[i].gFade + symO[i].gLen + 0.05) drawGroup(syms[i], t, symO[i]); }
+
+  // the emblem: ring, then petals, then the star, then the hub come into focus out of the rain; after ignition it turns slowly
+  function drawEmblem(t) {
+    if (t < embO[0].t0) return;
+    const age = t - T.ignite, out = seg(t, T.warp, T.warp + 0.55);
+    const sc = t < T.ignite ? 1 : (1 + 0.06 * Math.exp(-age * 3) + Math.sin(t * 1.6) * 0.008) * (1 + easeIn(seg(t, T.warp, T.end)) * 1.2);
+    AM = 1 - out;
+    ctx.save();
+    ctx.translate(W / 2, H / 2); ctx.scale(sc, sc); ctx.translate(-W / 2, -H / 2);
+    for (let i = 0; i < emb.length; i++) drawGroup(emb[i], t, embO[i]);
+    ctx.restore();
+    AM = 1;
+    // core glow building toward ignition
+    const u = seg(t, T.vortex + 1.2, T.ignite) * (1 - seg(t, T.ignite, T.ignite + 0.4));
+    if (u > 0.01) {
+      const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, S * (0.05 + u * 0.12));
+      g.addColorStop(0, `rgba(234,255,239,${u * 0.8})`); g.addColorStop(0.4, `rgba(0,255,110,${u * 0.5})`); g.addColorStop(1, 'rgba(0,255,110,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+  }
+
   // ---------------- visuals ----------------
   function resize() {
     k = Math.min(window.devicePixelRatio || 1, 1.25) * Math.min(1, 1700 / Math.max(1, window.innerWidth));
@@ -151,7 +324,7 @@
     }));
   }
 
-  function rainY(c, t) { return (t - T.rain - c.delay) * c.speed * H * 0.9; }
+  function rainY(c, t) { const v = t - T.rain - c.delay; return v < 0 ? -1e9 : (v * c.speed * H * 0.9) % (H + 16 * 18 * k); }
 
   // Speed note: canvas text is slow when the font or colour changes between glyphs, so everything below is drawn
   // in batches: all glyphs that share a size and colour together, all sparks of one brightness in one path.
@@ -171,51 +344,6 @@
     }
   }
 
-  function buildVortex(t) {
-    const fs = 18 * k;
-    vortex = [];
-    for (const c of cols) {
-      const y = rainY(c, t);
-      for (let j = 0; j < 6; j++) {
-        const gy = y - j * fs * 2;
-        if (gy < -fs || gy > H + fs) continue;
-        const dx = c.x - W / 2, dy = gy - H / 2;
-        vortex.push({ a: Math.atan2(dy, dx), r: Math.hypot(dx, dy), ch: c.trail[j], d: rand(0, 0.25), px: null, py: null });
-      }
-    }
-  }
-
-  function drawVortex(t) {
-    const fs = 18 * k, LV = 10;
-    ctx.textAlign = 'center';
-    // each particle's progress, rounded to one of 10 steps: one font, one colour, one trail path per step
-    const groups = Array.from({ length: LV }, () => []);
-    for (const p of vortex) {
-      const u = easeIn(clamp01((t - T.vortex - p.d) / (T.ignite - T.vortex - p.d)));
-      const r = p.r * Math.pow(1 - u, 1.4);
-      const a = p.a + u * u * 7;
-      const x = W / 2 + Math.cos(a) * r, y = H / 2 + Math.sin(a) * r;
-      groups[Math.min(LV - 1, (u * LV) | 0)].push([p, x, y]);
-    }
-    ctx.lineWidth = 1.2 * k;
-    groups.forEach((g, i) => {
-      if (!g.length) return;
-      const u = (i + 0.5) / LV;
-      ctx.strokeStyle = `hsla(${140 + u * 30},100%,65%,${0.25 + u * 0.5})`;
-      ctx.beginPath();
-      for (const [p, x, y] of g) if (p.px != null) { ctx.moveTo(p.px, p.py); ctx.lineTo(x, y); }
-      ctx.stroke();
-      ctx.font = `${(fs * (1 - u * 0.7)).toFixed(1)}px "Share Tech Mono", monospace`;
-      ctx.fillStyle = `hsla(${140 + u * 40},100%,${60 + u * 35}%,0.9)`;
-      for (const [p, x, y] of g) { ctx.fillText(p.ch, x, y); p.px = x; p.py = y; }
-    });
-    // core glow building up
-    const u = seg(t, T.vortex, T.ignite);
-    const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, S * (0.05 + u * 0.12));
-    g.addColorStop(0, `rgba(234,255,239,${u})`); g.addColorStop(0.4, `rgba(0,255,110,${u * 0.6})`); g.addColorStop(1, 'rgba(0,255,110,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-  }
 
   function buildSparks() {
     sparks = Array.from({ length: 520 }, () => {
@@ -246,97 +374,6 @@
     });
   }
 
-  // draw a circle "being drawn" from 0..p
-  function arcOn(x, y, r, p, start = -Math.PI / 2) {
-    if (p <= 0) return;
-    ctx.beginPath(); ctx.arc(x, y, r, start, start + TAU * Math.min(1, p)); ctx.stroke();
-  }
-
-  function geometry(t, color, dx, alpha) {
-    const R1 = S * 0.085;
-    const rot = (t - T.ignite) * 0.35 + easeIn(seg(t, T.warp, T.end)) * 6;
-    ctx.save();
-    ctx.translate(W / 2 + dx, H / 2);
-    ctx.rotate(rot);
-    const stroke = (w, a) => { ctx.lineWidth = w * k; ctx.strokeStyle = color(a * alpha); };
-
-    // seed of life: center + 6 petals, drawn on in sequence
-    const pts = [[0, 0]];
-    for (let i = 0; i < 6; i++) pts.push([Math.cos((i * TAU) / 6) * R1, Math.sin((i * TAU) / 6) * R1]);
-    pts.forEach(([x, y], i) => {
-      const p = easeOut(seg(t, T.ignite + 0.05 + i * 0.06, T.ignite + 0.45 + i * 0.06));
-      stroke(5, 0.25); arcOn(x, y, R1, p, (i * TAU) / 6);
-      stroke(1.6, 0.95); arcOn(x, y, R1, p, (i * TAU) / 6);
-    });
-    // flower of life: second ring of 12
-    const ring2 = [];
-    for (let s = 0; s < 6; s++) {
-      const a0 = (s * TAU) / 6, a1 = ((s + 1) * TAU) / 6;
-      ring2.push([Math.cos(a0) * 2 * R1, Math.sin(a0) * 2 * R1]);
-      ring2.push([(Math.cos(a0) + Math.cos(a1)) * R1, (Math.sin(a0) + Math.sin(a1)) * R1]);
-    }
-    ring2.forEach(([x, y], i) => {
-      const p = easeOut(seg(t, T.ignite + 0.35 + i * 0.03, T.ignite + 0.8 + i * 0.03));
-      stroke(1.2, 0.6); arcOn(x, y, R1, p);
-    });
-    // enclosing rings
-    stroke(2.2, 0.9); arcOn(0, 0, R1 * 3, easeOut(seg(t, T.ignite + 0.5, T.ignite + 1.0)));
-    stroke(1.2, 0.6); arcOn(0, 0, R1 * 3.25, easeOut(seg(t, T.ignite + 0.6, T.ignite + 1.1)), Math.PI / 2);
-    // metatron's cube: 13 points, lines grow out
-    const mp = [[0, 0]];
-    for (let i = 0; i < 6; i++) { const a = (i * TAU) / 6 - Math.PI / 2; mp.push([Math.cos(a) * R1 * 1.73, Math.sin(a) * R1 * 1.73]); }
-    for (let i = 0; i < 6; i++) { const a = (i * TAU) / 6 - Math.PI / 2; mp.push([Math.cos(a) * R1 * 3, Math.sin(a) * R1 * 3]); }
-    const lp = seg(t, T.ignite + 0.7, T.ignite + 1.3);
-    if (lp > 0) {
-      stroke(0.9, 0.55);
-      ctx.beginPath();
-      let n = 0;
-      for (let i = 0; i < mp.length; i++) for (let j = i + 1; j < mp.length; j++, n++) {
-        const q = clamp01(lp * 1.6 - (n / 78) * 0.6);
-        if (q <= 0) continue;
-        ctx.moveTo(mp[i][0], mp[i][1]);
-        ctx.lineTo(mp[i][0] + (mp[j][0] - mp[i][0]) * q, mp[i][1] + (mp[j][1] - mp[i][1]) * q);
-      }
-      ctx.stroke();
-    }
-    // hexagram spinning in
-    const hp = easeOut(seg(t, T.ignite + 0.6, T.ignite + 1.2));
-    if (hp > 0) {
-      ctx.save();
-      ctx.rotate((1 - hp) * -2.5);
-      const hr = R1 * 4.3 * hp;
-      for (const r0 of [-Math.PI / 2, Math.PI / 2]) {
-        ctx.beginPath();
-        for (let i = 0; i <= 3; i++) { const a = r0 + (i * TAU) / 3; i ? ctx.lineTo(Math.cos(a) * hr, Math.sin(a) * hr) : ctx.moveTo(Math.cos(a) * hr, Math.sin(a) * hr); }
-        stroke(4, 0.12); ctx.stroke();
-        stroke(1.4, 0.7); ctx.stroke();
-      }
-      ctx.restore();
-    }
-    // outer tick ring, counter-rotating
-    const tp = easeOut(seg(t, T.ignite + 0.8, T.ignite + 1.4));
-    if (tp > 0) {
-      ctx.save();
-      ctx.rotate(-rot * 2.2);
-      stroke(1.2, 0.7);
-      ctx.beginPath();
-      const rr = R1 * 5.1;
-      for (let i = 0; i < 96 * tp; i++) {
-        const a = (i / 96) * TAU, l = i % 8 === 0 ? R1 * 0.35 : R1 * 0.12;
-        ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); ctx.lineTo(Math.cos(a) * (rr + l), Math.sin(a) * (rr + l));
-      }
-      ctx.stroke();
-      stroke(1.8, 0.8); arcOn(0, 0, rr, tp);
-      ctx.restore();
-    }
-    // bindu
-    const bp = seg(t, T.ignite, T.ignite + 0.3);
-    if (bp > 0) {
-      ctx.fillStyle = color(alpha);
-      ctx.beginPath(); ctx.arc(0, 0, (3 + Math.sin(t * 8) * 1) * k * (1 + easeIn(seg(t, T.warp, T.end)) * 30), 0, TAU); ctx.fill();
-    }
-    ctx.restore();
-  }
 
   // the 36 soft light rays are painted once, at half size, and then only turned and faded each frame
   let rayImg = null;
@@ -453,25 +490,15 @@
     ctx.save();
     if (shake > 0.2) ctx.translate(rand(-shake, shake), rand(-shake, shake));
 
-    if (t < T.rain) {
-      // signal: one pulsing glyph
-      ctx.font = `${26 * k}px "Share Tech Mono", monospace`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = `rgba(157,255,184,${0.4 + 0.6 * Math.abs(Math.sin(t * 14))})`;
-      ctx.fillText('à¥', W / 2, H / 2);
-    } else if (t < T.vortex) {
-      drawRain(t, 1);
-    } else if (t < T.ignite) {
-      if (!vortex) buildVortex(T.vortex);
-      drawRain(t, 1 - seg(t, T.vortex, T.vortex + 0.4));
-      drawVortex(t);
+    const rf = 0.45 * seg(t, T.rain, T.rain + 0.4) * (1 - seg(t, T.ignite, T.ignite + 0.6));
+    if (rf > 0.01) drawRain(t, rf);
+    if (t < T.ignite) {
+      drawSymbols(t);
+      drawEmblem(t);
     } else {
       if (!sparks) buildSparks();
       drawRays(t);
-      const dim = t > T.title ? 0.6 + 0.4 * seg(t, T.warp, T.warp + 0.3) : 1; // let the title read
-      geometry(t, (a) => `rgba(29,233,182,${a * 0.55})`, -3 * k, dim);
-      geometry(t, (a) => `rgba(198,255,0,${a * 0.45})`, 3 * k, dim);
-      geometry(t, (a) => `rgba(0,255,110,${a})`, 0, dim);
+      drawEmblem(t);
       drawSparks(t, dt);
       drawShock(t);
       drawWarp(t);
@@ -507,16 +534,16 @@
     titleEl.classList.remove('show', 'warp');
     subEl.classList.remove('show');
     titleShown = subShown = warping = false;
-    vortex = sparks = streaks = rayImg = null;
+    sparks = streaks = rayImg = null;
     document.body.classList.add('booting');
     resize();
     buildRain();
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
     audio = mode === 'full' ? sound() : null;
     // build the heavy pieces now, not at the moment they first appear (that caused a hitch mid-intro)
-    buildVortex(T.vortex);
     buildSparks();
     buildRays();
+    buildShapes();
     running = true;
     last = 0; clock = 0; prevNow = 0;
     start = performance.now();

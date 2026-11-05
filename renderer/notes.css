@@ -114,8 +114,9 @@ body.lite i.nt-cursor { animation: none; }
 .act.danger { color: #ff8aa2; border-color: rgba(255, 45, 85, 0.5); }
 .nt-tools .act.on { background: var(--nt-hi); }
 .nt-work { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
-.nt-work.split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.nt-work.split .nt-read { border-left: 1px solid var(--panel-edge); }
+.nt-work .nt-read { display: none; }
+.nt-work.viewing .nt-read, .nt-work.only-read .nt-read { display: block; }
+.nt-work.viewing #nt-body { display: none; }
 #nt-body { min-height: 0; min-width: 0; margin: 0; padding: 18px 24px 60px; resize: none; border: 0; outline: none; color: var(--nt-text); caret-color: var(--g-hot); font: 14px/1.75 var(--nt-mono); tab-size: 2; background: linear-gradient(var(--nt-line) 1px, transparent 1px) 0 0 / 100% 24.5px, rgba(0, 0, 0, 0.22); overflow-y: auto; }
 #nt-body::placeholder { color: var(--g-dim); }
 .nt-read { min-height: 0; overflow-y: auto; padding: 18px 26px 60px; color: var(--nt-text); font: 14px/1.7 var(--nt-mono); background: rgba(0, 6, 2, 0.35); }
@@ -150,7 +151,7 @@ body.lite i.nt-cursor { animation: none; }
 .nt-file button { flex: none; padding: 4px 8px; border: 1px solid var(--panel-edge); background: none; color: var(--g-hot); font: 10px var(--nt-mono); letter-spacing: 1px; cursor: pointer; }
 .nt-file button:hover { border-color: var(--g); }
 /* small windows: the finished look hides, the text box keeps the room */
-@media (max-width: 1150px) { .nt-work.split { grid-template-columns: minmax(0, 1fr); } .nt-work.split .nt-read { display: none; } .nt-cols { grid-template-columns: 240px minmax(0, 1fr); } }
+@media (max-width: 1150px) { .nt-cols { grid-template-columns: 240px minmax(0, 1fr); } }
 .nt-modal { position: fixed; inset: 0; z-index: 60; background: rgba(0, 4, 0, 0.75); display: flex; align-items: center; justify-content: center; }
 .nt-mbox { position: relative; width: min(620px, 92vw); max-height: 86vh; overflow-y: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; }
 .nt-mbox h3 { margin: 0 0 6px; font: 500 15px var(--display); letter-spacing: 2px; color: var(--g); }
@@ -170,3 +171,68 @@ body.lite .nt-card, body.lite .nt-go { box-shadow: none; }
 .nt-top .acc-row { gap: 6px; }
 .nt-top .acc-dot { width: 17px; height: 17px; }
 .nt-accl { display: none; }
+
+/* collapsible top bar: closed shows only its button, like the sidebar's drop-downs */
+.nt-topt { height: 28px; padding: 0 10px; border: 1px solid var(--panel-edge); background: none; color: var(--g-hot); font: 10px var(--display); letter-spacing: 1.5px; cursor: pointer; }
+.nt-topt:hover { border-color: var(--g); background: var(--g-ghost); }
+.nt-top.closed { padding-top: 5px; padding-bottom: 5px; }
+.nt-top.closed > :not(.nt-topt):not(#nt-jchip):not(#nt-lock) { display: none; }
+/* Word-style toolbar */
+.nt-fmt { align-items: center; }
+.nt-fmt button:disabled { opacity: .35; cursor: default; }
+.nt-fmt select { height: 27px; background: rgba(0, 12, 5, .9); color: var(--g-hot); border: 1px solid var(--panel-edge); font: 11px var(--nt-mono); }
+.nt-col { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 27px; border: 1px solid var(--panel-edge); color: var(--g-hot); font: 700 13px var(--nt-mono); cursor: pointer; }
+.nt-col input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.nt-col:hover { border-color: var(--g); }
+.nt-read mark { background: #ffc40066; color: inherit; padding: 0 2px; }
+.nt-read u { text-underline-offset: 3px; }
+/* drag-to-reorder marker in the page list */
+.nt-p.drop-before { box-shadow: inset 0 3px 0 #b36bff; }
+.nt-p.drop-after { box-shadow: inset 0 -3px 0 #b36bff; }
+
+.nt-lockbanner { padding: 9px 12px; background: rgba(255, 196, 0, .1); border-bottom: 1px solid var(--amber, #ffc400); color: #ffe08a; font-size: 12px; line-height: 1.5; }
+.nt-lockbanner button { margin-left: 6px; padding: 3px 10px; border: 1px solid var(--amber, #ffc400); color: #ffc400; background: none; font: 10px var(--display); letter-spacing: 1.5px; cursor: pointer; }
+.nt-start { align-items: flex-start !important; justify-content: flex-start !important; text-align: left; padding: 34px 40px; overflow-y: auto; }
+.nt-start h2 { margin: 0 0 14px; color: var(--g-hot); font: 600 16px var(--display); letter-spacing: 3px; }
+.nt-startbtns { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+.nt-recent { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; width: 100%; max-width: 900px; margin-bottom: 18px; }
+.nt-recent button { text-align: left; padding: 10px 12px; border: 1px solid var(--panel-edge); background: rgba(0, 20, 8, .5); color: #eafff0; cursor: pointer; }
+.nt-recent button:hover { border-color: var(--g); background: var(--g-ghost); }
+.nt-recent b { display: block; font-weight: 400; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nt-recent span { font-size: 10px; color: var(--g-dim); }
+.nt-path { font-size: 11px; color: var(--g-dim); letter-spacing: 1px; margin-bottom: 4px; }
+
+/* journal calendar + templates */
+.nt-tplbtn { grid-column: 1 / -1; height: 30px; }
+.cal-nav { display: flex; align-items: center; gap: 6px; margin: 8px 0; } .cal-nav b { flex: 1; text-align: center; letter-spacing: 2px; color: var(--g); font: 500 12px var(--display); }
+.cal-wrap { position: relative; } .cal-wrap.locked .cal-grid { filter: grayscale(1) opacity(0.35); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-w { text-align: center; font-size: 9px; letter-spacing: 1px; color: var(--g-dim); padding: 2px 0; }
+.cal-d { position: relative; height: 38px; border: 1px solid var(--panel-edge); background: rgba(0, 0, 0, 0.4); color: var(--g); font: 12px Consolas, monospace; cursor: pointer; }
+.cal-d.off { border: 0; background: none; cursor: default; } .cal-d:disabled { cursor: default; }
+.cal-d:not(.off):not(:disabled):hover { border-color: var(--g); background: color-mix(in srgb, var(--g) 18%, transparent); }
+.cal-d.today { border-color: var(--g); box-shadow: inset 0 0 0 1px var(--g); }
+.cal-d.has { color: #eafff0; } .cal-d i { position: absolute; left: 50%; bottom: 5px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--g); box-shadow: 0 0 8px 2px var(--g); }
+.cal-lock { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; } .cal-lock span { font-size: 30px; } .cal-lock p { margin: 0; }
+.cal-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0 6px; }
+.cal-stats div { border: 1px solid var(--panel-edge); padding: 8px 4px; text-align: center; } .cal-stats b { display: block; font-size: 20px; color: var(--g); text-shadow: 0 0 8px var(--g); } .cal-stats span { font-size: 9px; letter-spacing: 1px; color: var(--g-dim); }
+.tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 12px; }
+.tpl-grid button { height: 40px; border: 1px solid var(--panel-edge); background: rgba(0, 0, 0, 0.4); color: var(--g); font: 500 11px var(--display); letter-spacing: 1px; cursor: pointer; }
+.tpl-grid button:hover { border-color: var(--g); background: color-mix(in srgb, var(--g) 18%, transparent); }
+
+/* section switcher: NOTEBOOK | THE VAULT | BULLET JOURNAL */
+.nt-sec { flex: none; display: flex; gap: 0; padding: 0 14px; border-bottom: 1px solid var(--panel-edge); background: rgba(0, 10, 4, 0.6); }
+.nt-sec button { height: 34px; padding: 0 20px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--g-dim); font: 500 11px var(--display); letter-spacing: 2.5px; cursor: pointer; }
+.nt-sec button:hover { color: var(--g); background: var(--g-ghost); }
+.nt-sec button.on { color: var(--g-hot); border-bottom-color: var(--g); background: var(--nt-hi); text-shadow: 0 0 8px color-mix(in srgb, var(--g) 50%, transparent); }
+.nt-app.sec-bujo .nt-top, .nt-app.sec-bujo .nt-import { display: none; }
+.nt-cols.hidden, .nt-bujo.hidden { display: none !important; }
+.nt-bujo { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+
+/* draggable line between the notebook list and the page list */
+.nt-books { border-bottom: 0; }
+.nt-split { flex: none; height: 8px; margin-top: -1px; cursor: row-resize; border-top: 1px solid var(--panel-edge); border-bottom: 1px solid var(--panel-edge); background: rgba(0, 0, 0, 0.35); position: relative; touch-action: none; }
+.nt-split::after { content: ''; position: absolute; left: 50%; top: 2px; width: 34px; height: 2px; margin-left: -17px; border-top: 1px solid var(--g-dim); border-bottom: 1px solid var(--g-dim); }
+.nt-split:hover, .nt-split.drag { background: color-mix(in srgb, var(--g) 22%, transparent); border-color: var(--g); }
+.nt-books.drop { outline: 1px dashed var(--g); outline-offset: -3px; background: var(--g-ghost); }
+.nt-b[draggable="true"] { cursor: grab; }

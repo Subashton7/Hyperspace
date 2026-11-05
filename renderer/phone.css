@@ -191,3 +191,40 @@ html, body { overflow-x: hidden; }
 #toast.bad { border-color: var(--red); color: #ffb3c1; }
 #pair-gate { position: fixed; inset: 0; z-index: 20; background: #000400; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; }
 #pair-gate .glitch { font: 800 22px var(--display); letter-spacing: 4px; color: var(--red); }
+
+/* ---------- matrix refresh: same look as the desktop ---------- */
+:root { --glow: 0 0 6px rgba(0, 255, 110, 0.75), 0 0 18px rgba(0, 255, 110, 0.35); --cut: 10px; }
+body::before { content: ''; position: fixed; inset: 0; z-index: 8; pointer-events: none; /* scanlines + vignette, painted once */
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.2) 2px 3px), radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%); }
+.top { padding-left: calc(12px + env(safe-area-inset-left, 0px)); padding-right: calc(12px + env(safe-area-inset-right, 0px)); box-shadow: 0 1px 14px rgba(0, 255, 110, 0.12); }
+.top b { user-select: none; -webkit-user-select: none; text-shadow: var(--glow); }
+.card, .tile { clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+  border-color: rgba(0, 255, 110, 0.4); background: linear-gradient(160deg, rgba(0, 32, 14, 0.8), rgba(0, 14, 6, 0.86)); box-shadow: inset 0 0 18px rgba(0, 255, 110, 0.06); }
+.setup { background: rgba(40, 0, 30, 0.6); border-color: var(--magenta); }
+.away { border-color: var(--amber); }
+.h { text-shadow: 0 0 6px rgba(0, 255, 110, 0.35); }
+main { padding-left: calc(12px + env(safe-area-inset-left, 0px)); padding-right: calc(12px + env(safe-area-inset-right, 0px)); }
+.page.on { animation: pg-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes pg-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.btns button { min-height: 52px; background: rgba(0, 255, 110, 0.04); transition: background 0.12s, transform 0.12s, box-shadow 0.12s; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.btns.big button { min-height: 64px; }
+.btns button:active, .seg button:active, .mode button:active { transform: scale(0.96); }
+.btns button.on { box-shadow: var(--glow); }
+.seg button, .mode button { min-height: 44px; }
+.m-bar input, .m-bar select { height: 48px; }
+.row { padding: 10px 6px; min-height: 64px; }
+.tabs > * { height: 66px; transition: color 0.2s, box-shadow 0.2s; }
+.tabs span { transition: transform 0.2s; }
+.tabs .on span { transform: translateY(-2px) scale(1.12); }
+input[type=range] { height: 36px; }
+.player, .tabs { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.player { bottom: calc(66px + var(--safe-b)); }
+#rain { opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { .page.on { animation: none; } .tabs span, .btns button { transition: none; } }
+
+/* tiny rabbit in the corner (hidden until the title is tapped 7 times) */
+#twr-peek { position: fixed; right: 6px; bottom: calc(70px + var(--safe-b)); z-index: 3; width: 36px; height: 40px; padding: 0; opacity: 0.85; transform: translateY(22px); transition: transform 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
+#twr-peek.up { transform: none; }
+#twr-peek canvas { width: 100%; height: 100%; image-rendering: pixelated; filter: drop-shadow(0 0 4px rgba(0, 255, 110, 0.6)); }
+#twr-say { position: fixed; right: 48px; bottom: calc(96px + var(--safe-b)); z-index: 9; max-width: 62vw; padding: 8px 12px; border: 1px solid var(--g); background: rgba(0, 20, 8, 0.96); color: var(--g-hot); font: 12px/1.4 var(--mono); opacity: 0; transform: scale(0.9); transform-origin: bottom right; transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
+#twr-say.show { opacity: 1; transform: none; }

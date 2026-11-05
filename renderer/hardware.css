@@ -106,3 +106,12 @@
 .hw-builtin > div { padding: 10px 0 0 8px; }
 .hw-note { font-size: 11px; max-width: 760px; line-height: 1.5; }
 .hw-err { color: var(--red); }
+
+/* USB history */
+.hw-hsearch { float: right; background: #00120a; border: 1px solid var(--panel-edge); color: #eafff0; padding: 3px 8px; font: 11px var(--mono); width: 240px; }
+.hw-hist #hw-hlist { max-height: 340px; overflow: auto; }
+.hw-htab { width: 100%; border-collapse: collapse; font: 11px var(--mono); }
+.hw-htab th { text-align: left; color: #7fd8a0; font-weight: 400; letter-spacing: 1px; padding: 4px 8px; position: sticky; top: 0; background: #00120a; }
+.hw-htab td { padding: 5px 8px; border-top: 1px solid rgba(0, 255, 110, .1); color: #b8ffd0; }
+.hw-htab tr.now td { color: #eafff0; }
+.hw-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--g); box-shadow: 0 0 8px var(--g); }

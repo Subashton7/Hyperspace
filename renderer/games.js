@@ -491,6 +491,12 @@
     root.querySelectorAll('[data-pc]').forEach((el) => el.addEventListener('click', () => { spPlay(0, me[+el.dataset.pc]); spLoop(); }));
   }
 
+  // The GAMES sidebar button is gone (the casino lives in SETTINGS): a small floating way back.
+  const back = document.createElement('button');
+  back.id = 'gm-back'; back.className = 'act'; back.textContent = '← SETTINGS'; back.hidden = true;
+  back.addEventListener('click', () => showView('settings'));
+  document.body.appendChild(back);
+  HS.viewListeners.push((v) => { back.hidden = v !== 'games'; });
   HS.viewListeners.push((v) => { if (v === 'games' && !root.innerHTML.trim()) lobby(); });
   lobby();
 })();

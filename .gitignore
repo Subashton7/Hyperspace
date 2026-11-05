@@ -17,3 +17,7 @@ core/dist/
 Thumbs.db
 desktop.ini
 .vscode/
+
+# another project's files that landed here by accident (kept on disk, never shipped)
+subashton-site/
+site-tuneup.html

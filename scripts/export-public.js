@@ -9,7 +9,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const out = path.resolve(process.argv[2] || path.join(root, '..', 'hyperspace-github'));
 // personal: notes for Claude about this laptop, the tune-up checklist, a script tied to one rekordbox library
-const PERSONAL = [/^CLAUDE\.md$/i, /^\.claude\//i,/^docs\/tune-up\.html$/i, /^scripts\/organize-rekordbox\.js$/i];
+const PERSONAL = [/^CLAUDE\.md$/i, /^\.claude\//i,/^docs\/tune-up\.html$/i, /^scripts\/organize-rekordbox\.js$/i, /^personal\//i]; // personal/ = private addons, never published
 
 if (fs.existsSync(out) && fs.readdirSync(out).length) { console.error(`${out} already has files in it: pick an empty folder`); process.exit(1); }
 const files = execFileSync('git', ['ls-files', '-z'], { cwd: root }).toString().split('\0').filter(Boolean);

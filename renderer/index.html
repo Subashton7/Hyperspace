@@ -13,10 +13,21 @@
   <link rel="stylesheet" href="modules.css" />
   <link rel="stylesheet" href="crate.css" />
 <link rel="stylesheet" href="notes.css" />
+<link rel="stylesheet" href="bujo.css" />
 <link rel="stylesheet" href="todo.css" />
 <link rel="stylesheet" href="games.css" />
+<link rel="stylesheet" href="gamehub.css" />
   <link rel="stylesheet" href="hardware.css" />
 <link rel="stylesheet" href="purple.css" />
+<link rel="stylesheet" href="rabbit.css" />
+<link rel="stylesheet" href="eggs.css" />
+<link rel="stylesheet" href="eggs-settings.css" />
+<link rel="stylesheet" href="clickfx.css" />
+<link rel="stylesheet" href="actionfx.css" />
+<link rel="stylesheet" href="twr-settings.css" />
+<link rel="stylesheet" href="hacker.css" />
+<link rel="stylesheet" href="whatsnew.css" />
+<link rel="stylesheet" href="welcome.css" />
 </head>
 <body data-fx="high" class="booting">
   <div id="intro">
@@ -78,23 +89,23 @@
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><path d="M0,-10 C6,-4 7,2 0,10 C-7,2 -6,-4 0,-10Z"/><path d="M0,-3 C3,0 3,4 0,7 C-3,4 -3,0 0,-3Z"/><circle r="10.5" stroke-dasharray="2 3"/></g></svg>
       <span>FANS</span>
     </button>
-    <button class="nav" data-view="vj" title="VJ: visuals that dance to your music, on screen, as wallpaper or sent to other apps">
+    <button class="nav hidden" data-view="vj" title="VJ now lives in CRATE > VJ (visuals that dance to your music)">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.1"><circle r="4"/><circle cx="4" r="4"/><circle cx="-4" r="4"/><circle cx="2" cy="3.46" r="4"/><circle cx="-2" cy="3.46" r="4"/><circle cx="2" cy="-3.46" r="4"/><circle cx="-2" cy="-3.46" r="4"/><circle r="10"/></g></svg>
       <span>VJ</span>
     </button>
-    <button class="nav" data-view="crate" title="CRATE: your music, with rekordbox BPM, keys and cues">
+    <button class="nav" data-view="crate" title="MUSIC: library, player/DJ and VJ in one place">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><circle r="10"/><circle r="6.2"/><circle r="2.2"/><path d="M0,-10 A10,10 0 0 1 10,0" stroke-width="2.2"/><path d="M-6.2,0 A6.2,6.2 0 0 1 0,-6.2" stroke-width="1.8"/></g></svg>
-      <span>CRATE</span>
+      <span>MUSIC</span>
     </button>
-    <button class="nav" data-view="deck" title="DECK: volume, now playing, speakers and screens">
-      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="-10" y="-7" width="20" height="14" rx="2"/><circle cx="-4" r="3.2"/><circle cx="4.5" r="3.2"/><path d="M-2,-10 L2,-10"/></g></svg>
-      <span>DECK</span>
+    <button class="nav" data-view="gamehub" title="GAMING: your games, game mode, playtime, performance overlay, controller tester">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M-6,-5 H6 C10,-5 11,3 9,6 C7.5,8 5,6 4,3 H-4 C-5,6 -7.5,8 -9,6 C-11,3 -10,-5 -6,-5Z"/><path d="M-6,-1.5 V1.5 M-7.5,0 H-4.5"/><circle cx="5" cy="-1" r="1" fill="currentColor"/><circle cx="7" cy="1.2" r="1" fill="currentColor"/></g></svg>
+      <span>GAMING</span>
     </button>
-    <button class="nav" data-view="router" title="FILE ROUTER: auto-sorts new downloads into folders">
+    <button class="nav moved hidden" data-view="router" title="FILE ROUTER: auto-sorts new downloads into folders">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M-10,0 H-3 M-3,0 C2,0 2,-7 9,-7 M-3,0 C2,0 2,7 9,7 M-3,0 H9"/><path d="M6,-9.5 L9,-7 L6,-4.5 M6,4.5 L9,7 L6,9.5 M6,-2.5 L9,0 L6,2.5"/></g></svg>
       <span>FILE ROUTER</span>
     </button>
-    <button class="nav" data-view="senses" title="SENSES: mic &amp; camera privacy switches, and which apps used them">
+    <button class="nav moved hidden" data-view="senses" title="SENSES: mic &amp; camera privacy switches, and which apps used them">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><path d="M-10,0 Q0,-9 10,0 Q0,9 -10,0Z"/><circle r="3.5"/><circle r="1" fill="currentColor"/></g></svg>
       <span>SENSES</span>
     </button>
@@ -102,11 +113,11 @@
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><path d="M-7,-10 H5 L8,-7 V10 H-7 Z"/><path d="M-4,-5 H4 M-4,-1 H4 M-4,3 H1"/><circle cx="5" cy="6" r="2.4"/><path d="M5,3.6 V2.5"/></g></svg>
       <span>NOTES</span>
     </button>
-    <button class="nav" data-view="todo" title="TO-DO: your list, and the De-Big-Tech My Life quest line">
+    <button class="nav" data-view="todo" title="TO-DO: your personal list, in categories">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><polygon points="0,-10 8.7,-5 8.7,5 0,10 -8.7,5 -8.7,-5"/><path d="M-4,0 L-1,3 L5,-4" stroke-width="1.6"/></g></svg>
       <span>TO-DO</span>
     </button>
-    <button class="nav" data-view="games" title="GAMES: blackjack, spades, poker">
+    <button class="nav hidden" data-view="games" title="GAMES (opened from Settings)">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="-9" y="-7" width="11" height="15" rx="1.5" transform="rotate(-12)"/><rect x="-2" y="-8" width="11" height="15" rx="1.5" transform="rotate(10)"/><path d="M3.5,-2 l2,3 -2,3 -2,-3z"/></g></svg>
       <span>GAMES</span>
     </button>
@@ -114,9 +125,13 @@
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="-8" y="-8" width="16" height="16" transform="rotate(45)"/><rect x="-8" y="-8" width="16" height="16"/><circle r="3"/></g></svg>
       <span>SOFTWARE</span>
     </button>
-    <button class="nav" data-view="hardware" title="HARDWARE: every USB port, hub and device, with power and speed">
+    <button class="nav moved hidden" data-view="hardware" title="HARDWARE: every USB port, hub and device, with power and speed">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><circle r="9"/><circle r="5"/><path d="M0,-12V-5M0,5V12M-12,0H-5M5,0H12"/></g></svg>
       <span>HARDWARE</span>
+    </button>
+    <button class="nav" data-view="ai" title="AI: the experts, and room for future AI tools">
+      <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><rect x="-6" y="-6" width="12" height="12" rx="2"/><path d="M-3,-1 L0,-4 L3,-1 M-3,3 H3"/><path d="M-3,-9.5 V-6 M3,-9.5 V-6 M-3,6 V9.5 M3,6 V9.5 M-9.5,-3 H-6 M-9.5,3 H-6 M6,-3 H9.5 M6,3 H9.5"/></g></svg>
+      <span>AI</span>
     </button>
     <button class="nav" data-view="settings" title="Settings: background artifacts, startup, keys, CRATE">
       <svg viewBox="-12 -12 24 24"><g fill="none" stroke="currentColor" stroke-width="1.2"><circle r="3.4"/><path d="M0,-10.5V-7M0,7V10.5M-10.5,0H-7M7,0H10.5M-7.4,-7.4L-5,-5M5,5L7.4,7.4M-7.4,7.4L-5,5M5,-5L7.4,-7.4"/><circle r="7" stroke-dasharray="2.2 2"/></g></svg>
@@ -127,7 +142,7 @@
 
   <main>
     <!-- ============ NEXUS ============ -->
-    <section class="view active" id="view-nexus">
+    <section class="view scroll active" id="view-nexus">
       <div class="nexus-grid">
         <div class="panel shield">
           <div class="panel-head"><span class="glyph">⟁</span> SENSORY SHIELD <span class="hint" title="Ctrl+Alt+Shift+M toggles mic · Ctrl+Alt+Shift+C toggles camera">C+A+S · M / C</span></div>
@@ -357,29 +372,21 @@
       </div>
     </section>
 
-    <!-- ============ VJ ============ -->
-    <section class="view" id="view-vj">
-      <div class="vj-wrap">
-        <div class="vj-stage" id="vj-stage">
-          <canvas id="vj-canvas"></canvas>
-          <div class="vj-hud">
-            <div class="vj-theme" id="vj-theme-name">FLOWER OF LIFE</div>
-            <div class="vj-bands"><i id="vb-bass"></i><i id="vb-mid"></i><i id="vb-treble"></i></div>
-            <div class="vj-beat" id="vj-beat"></div>
-            <div class="vj-src" id="vj-src">listening…</div>
-            <div class="vj-spout hidden" id="vj-spout">◉ SPOUT LIVE</div>
-          </div>
-          <button class="chip vj-fs" id="vj-fs" title="Fullscreen (F)">⛶ FULLSCREEN</button>
-        </div>
-        <div class="panel vj-ctrl">
-          <div class="panel-head"><span class="glyph">◉</span> VJ CONTROL</div>
-          <div class="vj-controls" id="vj-controls"></div>
-        </div>
-      </div>
-    </section>
+    <!-- VJ lives inside CRATE now (CRATE > VJ); this empty view just keeps old links working -->
+    <section class="view" id="view-vj"></section>
 
     <!-- ============ CRATE ============ -->
     <section class="view" id="view-crate">
+      <div class="cr-sections" id="cr-sections">
+        <div class="cr-sectiles" id="cr-secseg" role="tablist">
+          <button class="cr-stile" data-sec="lib" data-s="lib" title="Alt+1"><i>♫</i><b>LIBRARY</b><span>your tracks and playlists</span></button>
+          <button class="cr-stile" data-sec="dj" data-s="dj" title="Alt+2"><i>◉◉</i><b>PLAYER / DJ</b><span>decks, cues, mixing</span></button>
+          <button class="cr-stile" data-sec="vj" data-s="vj" title="Alt+3"><i>✺</i><b>VJ</b><span>visuals that dance to your music</span></button>
+          <button class="cr-stile" data-sec="deck" data-s="deck" title="Alt+4"><i>◈</i><b>DECK</b><span>volume, now playing, speakers, screens</span></button>
+        </div>
+        <button class="chip cr-fillbtn hidden" id="cr-fill" title="Give the VJ most of the screen, with a small music player in a corner (Esc to come back)">▣ VJ FULL</button>
+      </div>
+      <div class="cr-coach hidden" id="cr-coach"><span><b>NEW:</b> four sections live here. <b class="c1">LIBRARY</b> is your tracks, <b class="c2">PLAYER / DJ</b> adds decks and mixing, <b class="c3">VJ</b> makes visuals dance to the music, <b>DECK</b> is volume, speakers and screens. Switch with the big tiles or Alt+1 / 2 / 3 / 4.</span><button class="chip mini" id="cr-coach-x">GOT IT</button></div>
       <div class="crate">
         <aside class="panel cr-side">
           <div class="panel-head"><span class="glyph">◎</span> CRATE <span class="hint" id="cr-src">loading…</span><button class="chip mini right" id="cr-get" title="Get a free track from a SoundCloud link">⇩ GET</button><button class="chip mini" id="cr-refresh" title="Re-read the rekordbox library">⟳</button><button class="chip mini" id="cr-settings" title="CRATE settings: SoundCloud lookups, transitions, keys">⚙</button></div>
@@ -419,6 +426,25 @@
           <div class="cr-sidepage hidden" data-sidep="queue"><div class="cr-sub">up next <button class="chip mini right" id="cr-qclear">CLEAR</button></div><div class="cr-queue" id="cr-queue"></div></div>
         </aside>
         <div class="panel cr-dj hidden" id="cr-dj"></div>
+        <div class="cr-deckwrap" id="cr-deckwrap"></div>
+        <div class="vj-wrap" id="cr-vjwrap">
+          <div class="vj-stage" id="vj-stage">
+            <canvas id="vj-canvas"></canvas>
+            <div class="vj-hud">
+              <div class="vj-theme" id="vj-theme-name">FLOWER OF LIFE</div>
+              <div class="vj-bands"><i id="vb-bass"></i><i id="vb-mid"></i><i id="vb-treble"></i></div>
+              <div class="vj-beat" id="vj-beat"></div>
+              <div class="vj-src" id="vj-src">listening…</div>
+              <div class="vj-spout hidden" id="vj-spout">◉ SPOUT LIVE</div>
+            </div>
+            <button class="chip vj-fs" id="vj-fs" title="Output fullscreen (F)">⛶ FULLSCREEN</button>
+            <button class="chip vj-fill" id="vj-fill" title="Give the VJ most of the screen, with a small music player in a corner (Esc to come back)">▣ VJ FULL</button>
+          </div>
+          <div class="panel vj-ctrl">
+            <div class="panel-head"><span class="glyph">◉</span> VJ CONTROL</div>
+            <div class="vj-controls" id="vj-controls"></div>
+          </div>
+        </div>
         <div class="panel cr-player">
           <div class="cr-np">
             <div class="cr-npart" id="cr-npart"></div>
@@ -443,6 +469,22 @@
           </div>
         </div>
       </div>
+        <!-- CRATE > VJ FULL: small music controller that floats in a corner -->
+    <div class="cr-mini hidden" id="cr-mini" data-corner="br">
+      <div class="cm-grip" id="cm-grip" title="Hold and drag to a corner">
+        <span>♫ NOW PLAYING</span><span class="cm-bk" id="cm-bpm"></span>
+        <button class="chip mini" id="cm-lib" title="Back to the library">♫ LIBRARY</button><button class="chip mini" id="cm-exit" title="Leave VJ FULL (Esc)">✕</button>
+      </div>
+      <div class="cm-body">
+        <div class="cm-art" id="cm-art"></div>
+        <div class="cm-t"><b id="cm-title">nothing playing</b><span id="cm-artist">&nbsp;</span></div>
+      </div>
+      <div class="cm-seek"><span id="cm-cur">0:00</span><input type="range" id="cm-pos" min="0" max="1000" value="0" /><span id="cm-len">0:00</span></div>
+      <div class="cm-ctl">
+        <button id="cm-prev" title="Previous">⏮</button><button id="cm-pp" class="cm-pp" title="Play / pause">▶</button><button id="cm-next" title="Next">⏭</button>
+        <span class="cm-vol">♪<input type="range" id="cm-vol" min="0" max="100" value="100" title="Volume" /></span>
+      </div>
+    </div>
     </section>
 
     <!-- ============ DECK ============ -->
@@ -571,6 +613,7 @@
 
     <!-- ============ GAMES ============ -->
     <section class="view" id="view-games"></section>
+    <section class="view" id="view-gamehub"></section>
 
     <!-- ============ SEALED DIMENSIONS ============ -->
     <section class="view" id="view-software">
@@ -578,6 +621,23 @@
         <div class="sealed-text"><div class="glitch big" data-text="DIMENSION SEALED">DIMENSION SEALED</div><p>Software manager · installed apps, startup entities, updates</p><p class="dim">coming in a future release</p></div></div>
     </section>
     <section class="view" id="view-hardware"></section>
+
+    <!-- ============ AI ============ -->
+    <section class="view scroll" id="view-ai">
+      <div class="ai-wrap">
+        <div class="ai-head"><div class="kicker">AI</div><h2 class="glitch" data-text="AI WORKBENCH">AI WORKBENCH</h2></div>
+        <div id="ai-experts"></div>
+        <div class="ai-soon">
+          <div class="ai-soon-h">COMING SOON</div>
+          <div class="ai-cards" id="ai-cards">
+            <div class="panel ai-card"><div class="panel-head"><span class="glyph">◈</span> ASK ABOUT MY PC</div><p class="dim tiny">Plain-language answers about temperatures, fans, ports and what is eating your RAM.</p></div>
+            <div class="panel ai-card"><div class="panel-head"><span class="glyph">◈</span> SMART PLAYLISTS</div><p class="dim tiny">Describe a mood and get a crate built from your library.</p></div>
+            <div class="panel ai-card"><div class="panel-head"><span class="glyph">◈</span> NOTE HELPER</div><p class="dim tiny">Summaries and search that understand your notes. Stays on this laptop.</p></div>
+            <div class="panel ai-card"><div class="panel-head"><span class="glyph">◈</span> VISUAL DIRECTOR</div><p class="dim tiny">Suggest VJ looks that match the track.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="statusbar">
@@ -664,6 +724,7 @@
   <script src="intro.js"></script>
   <script src="accent.js"></script>
   <script src="fx.js"></script>
+  <script src="welcome.js"></script>
   <script src="app.js"></script>
   <script src="afterburner.js"></script>
   <script src="thermal.js"></script>
@@ -673,13 +734,30 @@
   <script src="router.js"></script>
   <script src="crate-engine.js"></script>
   <script src="crate.js"></script>
+  <script src="crate-vj.js"></script>
   <script src="crate-dj.js"></script>
   <script src="widgets.js"></script>
   <script src="settings.js"></script>
+<script src="twr-settings.js"></script>
+<script src="ctxmenu.js"></script>
+<script src="spell.js"></script>
+<script src="bujo.js"></script>
 <script src="notes.js"></script>
 <script src="todo.js"></script>
 <script src="games.js"></script>
+<script src="gamehub.js"></script>
   <script src="hardware.js"></script>
+<script src="addons.js"></script>
+<script src="sidebar.js"></script>
+<script src="navfx.js"></script>
+<script src="rabbit.js"></script>
+<script src="eggs.js"></script>
+<script src="eggs-settings.js"></script>
+<script src="clickfx.js"></script>
+<script src="actionfx.js"></script>
+<script src="hacker.js"></script>
+<script src="backup.js"></script>
+<script src="whatsnew.js"></script>
 <script src="find.js"></script>
   <script src="tabs.js"></script>
 </body>

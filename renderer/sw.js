@@ -1,7 +1,7 @@
 // HYPERSPACE phone app, offline: keeps the app itself (pages, scripts, fonts, icons) so it opens from the home
 // screen with the laptop off. Music and covers live in the 'hs-music' cache, filled by SYNC in phone.js;
 // covers are served from there, tracks are read by the page itself. The laptop's API is never cached.
-const APP = 'hs-app-v1';
+const APP = 'hs-app-v2';
 const SHELL = ['phone.html', 'phone.css', 'phone.js', 'phone-vj.js', 'remote.js', 'vj-themes.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
   '../node_modules/@fontsource/share-tech-mono/index.css', '../node_modules/@fontsource/orbitron/500.css', '../node_modules/@fontsource/orbitron/800.css', '../assets/subashton-text.png'];
 

@@ -1,0 +1,39 @@
+/* SETTINGS > THE WHITE RABBIT */
+.twrs-master { margin-top: 12px; padding: 16px 20px; border: 2px solid var(--g-dim); cursor: pointer; display: flex; flex-direction: column; gap: 4px; text-align: center; transition: .2s; font-family: Orbitron, 'Share Tech Mono', monospace; letter-spacing: 4px; font-size: 22px; color: var(--g-mid); background: rgba(0,0,0,.35); }
+.twrs-master small { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 1.5px; color: var(--g-dim); }
+.twrs-master.on { border-color: var(--g); color: var(--g-hot); box-shadow: 0 0 22px rgba(0,255,110,.45), inset 0 0 22px rgba(0,255,110,.12); background: rgba(0,255,110,.07); }
+.twrs-master:hover { transform: translateY(-1px); }
+.twrs-stage { height: 190px; border: 1px solid rgba(0,255,110,.25); background: radial-gradient(circle at 50% 80%, rgba(0,255,110,.14), transparent 70%), rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; position: relative; }
+.twrs-name { background: rgba(0,0,0,.5); border: 1px solid var(--g-dim); color: var(--g-hot); padding: 5px 8px; font: inherit; letter-spacing: 2px; }
+.twrs-name:focus { outline: none; border-color: var(--g); box-shadow: 0 0 8px rgba(0,255,110,.4); }
+.twrs-xp { height: 10px; border: 1px solid var(--g-dim); background: rgba(0,0,0,.5); }
+.twrs-xp div { height: 100%; background: linear-gradient(90deg, var(--g-mid), var(--g)); box-shadow: 0 0 8px var(--g); transition: width .5s; }
+.twrs-coins { font-size: 14px; color: #ffd84a; letter-spacing: 2px; text-shadow: 0 0 8px rgba(255,216,74,.5); }
+.twrs-coins b { font-size: 18px; }
+.twrs-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.twrs-stat { border: 1px solid rgba(0,255,110,.2); padding: 5px 2px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.twrs-stat b { color: var(--g-hot); font-size: 15px; font-weight: normal; }
+.twrs-stat span { font-size: 8px; letter-spacing: 1px; color: var(--g-mid); }
+.twrs-msg { min-height: 14px; color: var(--g-hot); }
+.twrs-msg.bad { color: #ff6a6a; }
+.twrs-wide { margin-top: 12px; }
+.twrs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.twrs-pgrid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.twrs-card { --rc: #6a8a76; position: relative; border: 1px solid var(--rc); background: rgba(0,0,0,.4); padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; text-align: center; transition: transform .15s, box-shadow .15s; }
+.twrs-card:hover { transform: translateY(-2px); box-shadow: 0 0 14px var(--rc); }
+.twrs-card.r-uncommon { --rc: #3ddc84; } .twrs-card.r-rare { --rc: #3da8ff; } .twrs-card.r-epic { --rc: #b45cff; } .twrs-card.r-legend { --rc: #ffb62e; box-shadow: 0 0 10px rgba(255,182,46,.35); }
+.twrs-card.eq { background: rgba(0,255,110,.12); box-shadow: 0 0 16px var(--g), inset 0 0 10px rgba(0,255,110,.2); border-color: var(--g); }
+.twrs-card.locked .twrs-mini { filter: grayscale(1) brightness(.55); }
+.twrs-mini { width: 90px; height: 90px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+.twrs-sw { position: absolute; top: 6px; right: 6px; width: 12px; height: 12px; border: 1px solid #fff6; border-radius: 50%; }
+.twrs-nm { font-size: 10px; letter-spacing: 1.5px; color: var(--g-hot); }
+.twrs-pr em { font-style: normal; font-size: 9px; letter-spacing: 1px; color: var(--g-mid); }
+.twrs-pr em.buy { color: #ffd84a; }
+.twrs-rar { font-size: 8px; letter-spacing: 2px; color: var(--rc); }
+.twrs-pers { align-items: flex-start; text-align: left; padding: 10px; }
+.twrs-desc { font-size: 10px; color: var(--g-mid); line-height: 1.4; }
+.twrs-card.unlock { animation: twrs-pop .9s ease-out; }
+@keyframes twrs-pop { 0% { transform: scale(.8); box-shadow: 0 0 0 var(--g); } 40% { transform: scale(1.12); box-shadow: 0 0 40px 8px var(--g); } 100% { transform: scale(1); } }
+.twrs-zzz { font-size: 28px; letter-spacing: 8px; color: var(--g-dim); animation: twrs-z 2s ease-in-out infinite; }
+@keyframes twrs-z { 50% { opacity: .3; transform: translateY(-6px); } }
+.twrs-reset { border-color: #ff6a6a !important; color: #ff6a6a !important; }

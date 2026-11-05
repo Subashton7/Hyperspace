@@ -1,4 +1,4 @@
-// TO-DO: a plain to-do list, plus the quest line "DE-BIG-TECH MY LIFE": stages from quick wins to running
+// TO-DO: a personal to-do list in colour-coded categories. The quest line "DE-BIG-TECH MY LIFE": stages from quick wins to running
 // your own cloud, every quest rated for difficulty and impact, with XP, ranks, badges and a live percentage.
 // Progress is saved in todo.json next to the app's settings (it holds checkmarks, nothing private).
 (() => {
@@ -116,7 +116,7 @@
   ];
 
   // ---------------- state ----------------
-  let st = { quests: {}, tasks: [], badges: {}, rank: 0, tab: 'quests', sort: 'stage', hideDone: false, open: {} };
+  let st = { quests: {}, tasks: [], badges: {}, rank: 0, sort: 'stage', hideDone: false, open: {}, cats: [], tcat: 'all', tcol: {} };
   const save = () => call('todoSave', st).catch(() => {});
   const done = () => Q.filter((q) => st.quests[q.id]?.done);
   const xp = () => done().reduce((a, q) => a + XP(q), 0);
@@ -134,17 +134,23 @@
   }
 
   // ---------------- render ----------------
-  function render() {
+  function render() { renderTodo(); renderQuest(); }
+  // The quest line is not part of the TO-DO page any more: SETTINGS mounts it into its own tile (window.hsQuestMount).
+  let qroot = null;
+  window.hsQuestMount = (el) => { qroot = el || null; renderQuest(); };
+  function renderQuest() {
+    if (!qroot) return;
+    const root = qroot;
     const p = pct(), r = rankAt(p), nm = nextMove(), nextRank = RANKS[r + 1];
     const toNext = nextRank ? Math.max(0, Math.ceil(nextRank.at * TOTAL - xp())) : 0;
     const C = 2 * Math.PI * 52;
-    root.innerHTML = `<div class="td-wrap">
+    root.innerHTML = `<div class="td-wrap td-qwrap">
       <div class="td-hero panel">
         <div class="td-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="bg"/><circle cx="60" cy="60" r="52" class="fg" style="stroke-dasharray:${C};stroke-dashoffset:${C * (1 - p / 100)}"/>
           <g class="geo">${[0, 60, 120].map((a) => `<ellipse cx="60" cy="60" rx="34" ry="13" transform="rotate(${a} 60 60)"/>`).join('')}</g></svg>
           <div class="td-pct"><b>${p}%</b><span>DE-BIG-TECHED</span></div></div>
         <div class="td-who">
-          <div class="td-kicker">QUEST LINE · DE-BIG-TECH MY LIFE</div>
+          <div class="td-kicker">GLITCH IN THE FEED · DE-BIG-TECH MY LIFE</div>
           <div class="td-rank glitch" data-text="${RANKS[r].name}">${RANKS[r].name}</div>
           <div class="td-line">${RANKS[r].line}</div>
           <div class="td-xp"><b>${xp()}</b> / ${TOTAL} XP · ${done().length} of ${Q.length} quests${nextRank ? ` · <span>${toNext} XP to ${nextRank.name}</span>` : ''}</div>
@@ -153,11 +159,10 @@
         </div>
         <div class="td-badges">${BADGES.map((b) => `<div class="td-badge ${st.badges[b.id] ? 'got' : ''}" title="${esc(b.how)}${st.badges[b.id] ? ` · earned ${new Date(st.badges[b.id]).toLocaleDateString()}` : ''}"><i>⬢</i><span>${b.name}</span></div>`).join('')}</div>
       </div>
-      <div class="td-tabs"><button data-tab="quests" class="${st.tab === 'quests' ? 'on' : ''}">⬢ QUESTS</button><button data-tab="tasks" class="${st.tab === 'tasks' ? 'on' : ''}">☐ MY TO-DO <em>${st.tasks.filter((t) => !t.done).length}</em></button>
-        ${st.tab === 'quests' ? `<span class="grow"></span><div class="seg small" id="td-sort">${[['stage', 'BY STAGE'], ['value', 'BEST VALUE'], ['easy', 'EASIEST'], ['impact', 'BIGGEST IMPACT']].map(([k, l]) => `<button data-sort="${k}" class="${st.sort === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-        <label class="td-hide"><input type="checkbox" id="td-hide" ${st.hideDone ? 'checked' : ''}> hide done</label>` : ''}</div>
-      <div class="td-body">${st.tab === 'quests' ? questsHtml() : tasksHtml()}</div></div>`;
-    wire();
+      <div class="td-tabs"><span class="grow"></span><div class="seg small" id="td-sort">${[['stage', 'BY STAGE'], ['value', 'BEST VALUE'], ['easy', 'EASIEST'], ['impact', 'BIGGEST IMPACT']].map(([k, l]) => `<button data-sort="${k}" class="${st.sort === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <label class="td-hide"><input type="checkbox" id="td-hide" ${st.hideDone ? 'checked' : ''}> hide done</label></div>
+      <div class="td-body">${questsHtml()}</div></div>`;
+    wireQuest(root);
   }
   function questCard(q) {
     const s = st.quests[q.id] || {}, steps = s.steps || {}, isOpen = st.open[q.id];
@@ -189,22 +194,13 @@
         ${shown.map(questCard).join('') || '<p class="dim td-alldone">All done in this stage.</p>'}</div>`;
     }).join('');
   }
-  function tasksHtml() {
-    const open = st.tasks.filter((t) => !t.done), fin = st.tasks.filter((t) => t.done);
-    const row = (t) => `<div class="td-t ${t.done ? 'done' : ''}"><label class="td-check"><input type="checkbox" data-t="${t.id}" ${t.done ? 'checked' : ''}><i></i></label><span>${esc(t.text)}</span><button data-del="${t.id}" title="remove">✕</button></div>`;
-    return `<div class="td-stage"><div class="td-add"><input id="td-new" placeholder="add a to-do and press Enter…" maxlength="200"><button class="act" id="td-addb">ADD</button></div>
-      ${open.map(row).join('') || '<p class="dim">Nothing to do. Nice.</p>'}
-      ${fin.length ? `<div class="td-shead"><b>DONE</b><span class="dim">${fin.length}</span><span class="grow"></span><button class="act" id="td-clear">CLEAR DONE</button></div>${fin.slice(-30).reverse().map(row).join('')}` : ''}</div>`;
-  }
-
-  function wire() {
-    root.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { st.tab = b.dataset.tab; save(); render(); }));
-    root.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { st.sort = b.dataset.sort; save(); render(); }));
-    $('#td-hide')?.addEventListener('change', (e) => { st.hideDone = e.target.checked; save(); render(); });
-    root.querySelectorAll('[data-toggle]').forEach((el) => el.addEventListener('click', () => { st.open[el.dataset.toggle] = !st.open[el.dataset.toggle]; render(); }));
+  function wireQuest(root) {
+    root.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { st.sort = b.dataset.sort; save(); renderQuest(); }));
+    root.querySelector('#td-hide')?.addEventListener('change', (e) => { st.hideDone = e.target.checked; save(); renderQuest(); });
+    root.querySelectorAll('[data-toggle]').forEach((el) => el.addEventListener('click', () => { st.open[el.dataset.toggle] = !st.open[el.dataset.toggle]; renderQuest(); }));
     root.querySelectorAll('[data-jump]').forEach((b) => b.addEventListener('click', () => {
-      st.tab = 'quests'; st.sort = 'stage'; st.hideDone = false; st.open[b.dataset.jump] = true; render();
-      $(`#q-${b.dataset.jump}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      st.sort = 'stage'; st.hideDone = false; st.open[b.dataset.jump] = true; renderQuest();
+      root.querySelector(`#q-${b.dataset.jump}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }));
     root.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => $(`.nav[data-view="${b.dataset.open}"]`)?.click()));
     root.querySelectorAll('[data-q]').forEach((cb) => cb.addEventListener('change', () => setQuest(cb.dataset.q, cb.checked)));
@@ -215,16 +211,225 @@
       if (cb.checked && !s.done && q.steps.every((_, j) => s.steps[j])) return setQuest(id, true); // every step ticked: quest done
       save();
     }));
-    const add = () => { const v = $('#td-new').value.trim(); if (!v) return; st.tasks.push({ id: Date.now().toString(36), text: v, done: false, at: Date.now() }); save(); render(); $('#td-new')?.focus(); };
-    $('#td-addb')?.addEventListener('click', add);
-    $('#td-new')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
-    root.querySelectorAll('[data-t]').forEach((cb) => cb.addEventListener('change', () => { const t = st.tasks.find((x) => x.id === cb.dataset.t); t.done = cb.checked; t.doneAt = Date.now(); save(); render(); }));
-    root.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => { st.tasks = st.tasks.filter((x) => x.id !== b.dataset.del); save(); render(); }));
+  }
+
+  // ---------------- the personal to-do list, in categories ----------------
+  const COLORS = ['#00ff6e', '#c6ff00', '#19e6ff', '#ff4fd8', '#b388ff', '#ff8a65', '#ffd54f', '#7fd8a0'];
+  const COLORNAME = { '#00ff6e': 'green', '#c6ff00': 'lime', '#19e6ff': 'cyan', '#ff4fd8': 'pink', '#b388ff': 'violet', '#ff8a65': 'orange', '#ffd54f': 'gold', '#7fd8a0': 'mint' };
+  const catOf = (id) => st.cats.find((c) => c.id === id) || st.cats[0];
+  const tcat = (t) => catOf(t.cat).id;
+  const dayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  function ensureCats() {
+    if (!Array.isArray(st.cats) || !st.cats.length) st.cats = [{ id: 'general', name: 'General', color: COLORS[0] }];
+    if (!st.cats.some((c) => c.id === 'general')) st.cats.unshift({ id: 'general', name: 'General', color: COLORS[0] });
+    if (st.tcat !== 'all' && !st.cats.some((c) => c.id === st.tcat)) st.tcat = 'all';
+    st.tcol ||= {};
+  }
+  // little pop-up asking for a name (the browser prompt() does not exist in Electron)
+  function askName(title, initial, cb, withColor) {
+    const el = document.createElement('div');
+    el.className = 'td-ask';
+    let color = withColor ? COLORS[st.cats.length % COLORS.length] : null;
+    el.innerHTML = `<div class="panel"><div class="td-kicker">${esc(title)}</div><input maxlength="30" value="${esc(initial || '')}" placeholder="name…">
+      ${withColor ? `<div class="td-colors">${COLORS.map((c) => `<i data-c="${c}" style="background:${c}" class="${c === color ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+      <div class="td-askb"><button class="act" data-ok>OK</button><button class="act" data-no>CANCEL</button></div></div>`;
+    document.body.appendChild(el);
+    const inp = el.querySelector('input'); inp.focus(); inp.select();
+    const close = () => el.remove();
+    const ok = () => { const v = inp.value.trim(); if (!v) return inp.focus(); close(); cb(v, color); };
+    el.querySelector('[data-ok]').addEventListener('click', ok);
+    el.querySelector('[data-no]').addEventListener('click', close);
+    el.addEventListener('mousedown', (e) => { if (e.target === el) close(); });
+    el.querySelectorAll('[data-c]').forEach((i) => i.addEventListener('click', () => { color = i.dataset.c; el.querySelectorAll('[data-c]').forEach((x) => x.classList.toggle('on', x === i)); }));
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); else if (e.key === 'Escape') { e.stopPropagation(); close(); } });
+  }
+  function addCat() {
+    askName('NEW CATEGORY', '', (name, color) => {
+      const c = { id: newId(), name, color }; st.cats.push(c); st.draftCat = c.id; save(); renderTodo();
+    }, true);
+  }
+  function catMenu(e, c) {
+    window.hsMenu?.(e, [
+      { label: 'Rename…', run: () => askName('RENAME CATEGORY', c.name, (v) => { c.name = v; save(); renderTodo(); }) },
+      '-',
+      ...COLORS.map((x) => ({ label: `Colour: ${COLORNAME[x]}${x === c.color ? ' (now)' : ''}`, off: x === c.color, run: () => { c.color = x; save(); renderTodo(); } })),
+      '-',
+      { label: 'Mark all done', run: () => { st.tasks.forEach((t) => { if (tcat(t) === c.id && !t.done) { t.done = true; t.doneAt = Date.now(); } }); save(); renderTodo(); } },
+      ...(c.id === 'general' ? [] : ['-', { label: 'Delete category (items move to General)', danger: true, run: () => { st.tasks.forEach((t) => { if (t.cat === c.id) t.cat = 'general'; }); st.cats = st.cats.filter((x) => x !== c); if (st.tcat === c.id) st.tcat = 'all'; save(); renderTodo(); } }]),
+    ], c.name);
+  }
+  function taskRow(t) {
+    const c = catOf(t.cat);
+    return `<div class="td-t ${t.done ? 'done' : ''} ${t.star ? 'star' : ''}" draggable="true" data-row="${t.id}" style="--cc:${c.color}"><label class="td-check"><input type="checkbox" data-t="${t.id}" ${t.done ? 'checked' : ''}><i></i></label><span class="td-tx">${esc(t.text)}</span>${dueChip(t)}<button class="td-star" data-star="${t.id}" title="${t.star ? 'remove priority' : 'mark as priority'}">${t.star ? '★' : '☆'}</button><button data-del="${t.id}" title="remove">✕</button></div>`;
+  }
+  function sectionHtml(c) {
+    const mine = st.tasks.filter((t) => tcat(t) === c.id);
+    const open = mine.filter((t) => !t.done).sort(st.tsort === 'due' ? (a, b) => dueMs(a) - dueMs(b) || a.at - b.at : (a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0) || a.at - b.at);
+    const fin = mine.filter((t) => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+    const total = mine.length, pc = total ? Math.round((fin.length / total) * 100) : 0;
+    const col = !!st.tcol['c:' + c.id], dcol = st.tcol['d:' + c.id] !== false; // the done pile is folded by default
+    return `<div class="td-sec ${col ? 'folded' : ''}" data-sec="${c.id}" style="--cc:${c.color}">
+      <div class="td-sh" data-cat="${c.id}" title="click to fold · right-click for rename, colour, delete"><span class="td-arrow">${col ? '▸' : '▾'}</span><b>${esc(c.name)}</b><span class="td-cnt">${fin.length}/${total}</span><div class="td-sbar"><i style="width:${pc}%"></i></div></div>
+      ${col ? '' : `<div class="td-sb">${open.map(taskRow).join('') || `<p class="dim td-none">${total ? 'All done here.' : 'Empty. Drag an item here or add one above.'}</p>`}
+      ${fin.length ? `<div class="td-dh" data-dfold="${c.id}"><span>${dcol ? '▸' : '▾'}</span> DONE <em>${fin.length}</em></div>${dcol ? '' : fin.slice(0, 40).map(taskRow).join('')}` : ''}</div>`}
+    </div>`;
+  }
+  function renderTodo() {
+    ensureCats();
+    const openAll = st.tasks.filter((t) => !t.done), overdueN = openAll.filter((t) => dueState(t) === 'over').length, doneToday = st.tasks.filter((t) => t.done && (t.doneAt || 0) >= dayStart()).length;
+    const cnt = (id) => openAll.filter((t) => tcat(t) === id).length;
+    const shown = st.tcat === 'all' ? st.cats.filter((c) => st.tasks.some((t) => tcat(t) === c.id)) : st.cats.filter((c) => c.id === st.tcat);
+    const pick = st.draftCat && st.cats.some((c) => c.id === st.draftCat) ? st.draftCat : (st.tcat !== 'all' ? st.tcat : 'general');
+    const empty = !st.tasks.length;
+    root.innerHTML = `<div class="td-wrap">
+      <div class="td-top"><div><div class="td-kicker">PERSONAL LIST</div><h2>TO-DO</h2></div><span class="grow"></span>
+        <div class="td-stat"><b>${openAll.length}</b><span>OPEN</span></div><div class="td-stat ${overdueN ? 'bad' : ''}"><b>${overdueN}</b><span>OVERDUE</span></div><div class="td-stat"><b>${doneToday}</b><span>DONE TODAY</span></div></div>
+      <div class="td-add panel"><input id="td-new" placeholder="add a to-do and press Enter…" maxlength="200">
+        <input type="datetime-local" id="td-due" value="${dueDraft}" title="optional: due date and time">
+        <select id="td-pick" title="category">${st.cats.map((c) => `<option value="${c.id}" ${c.id === pick ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">+ NEW CATEGORY…</option></select>
+        <button class="td-starb" id="td-prio" title="priority (shows first)">☆</button><button class="act" id="td-addb">ADD</button></div>
+      <div class="td-quick"><span>DUE</span>${[['today', 'Today'], ['tomorrow', 'Tomorrow'], ['week', 'Next week']].map(([k, l]) => `<button class="td-chip" data-q="${k}" style="--cc:var(--g)">${l}</button>`).join('')}<button class="td-chip" id="td-qpick" style="--cc:var(--g)">Pick…</button><span class="grow"></span><button class="td-chip ${st.tsort === 'due' ? 'on' : ''}" id="td-sortdue" style="--cc:var(--g)" title="order each list by due date">SORT: ${st.tsort === 'due' ? 'DUE' : 'DEFAULT'}</button></div>
+      <div class="td-chips"><button class="td-chip ${st.tcat === 'all' ? 'on' : ''}" data-chip="all" style="--cc:var(--g)">ALL <em>${openAll.length}</em></button>
+        ${st.cats.map((c) => `<button class="td-chip ${st.tcat === c.id ? 'on' : ''}" data-chip="${c.id}" style="--cc:${c.color}"><i></i>${esc(c.name)} <em>${cnt(c.id)}</em></button>`).join('')}
+        <button class="td-chip plus" id="td-newcat" title="new category">+</button><span class="grow"></span>
+        ${st.tasks.some((t) => t.done) ? '<button class="act" id="td-clear">CLEAR DONE</button>' : ''}</div>
+      ${empty ? `<div class="td-empty"><svg viewBox="0 0 120 120"><g fill="none" stroke="currentColor" stroke-width="1.2">${[0, 60, 120].map((a) => `<ellipse cx="60" cy="60" rx="40" ry="15" transform="rotate(${a} 60 60)"/>`).join('')}<circle cx="60" cy="60" r="50"/></g></svg><b>NOTHING TO DO. YET.</b><span>Type something above, pick a category, press Enter. Right-click anything for more.</span></div>`
+        : shown.map(sectionHtml).join('') || '<div class="td-empty"><b>NOTHING IN THIS CATEGORY</b><span>Add something above, or drag an item onto its chip.</span></div>'}
+    </div>`;
+    wireTodo();
+  }
+  function wireTodo() {
+    let prio = false;
+    const inp = $('#td-new');
+    const add = () => {
+      const v = inp.value.trim(); if (!v) return;
+      const cat = $('#td-pick').value === '__new' ? 'general' : $('#td-pick').value;
+      const task = { id: newId(), text: v, done: false, at: Date.now(), cat, star: prio };
+      if (dueDraft) { const ms = Date.parse(dueDraft); if (!isNaN(ms)) { task.due = new Date(ms).toISOString(); if (ms <= Date.now()) task.reminded = true; } }
+      dueDraft = ''; st.tasks.push(task);
+      st.draftCat = cat; save(); renderTodo(); $('#td-new')?.focus();
+    };
+    $('#td-addb').addEventListener('click', add);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+    $('#td-prio').addEventListener('click', (e) => { prio = !prio; e.target.textContent = prio ? '★' : '☆'; e.target.classList.toggle('on', prio); });
+    $('#td-pick').addEventListener('change', (e) => { if (e.target.value === '__new') { e.target.value = 'general'; addCat(); } else st.draftCat = e.target.value; });
+    $('#td-newcat').addEventListener('click', addCat);
+    $('#td-due').addEventListener('change', (e) => { dueDraft = e.target.value; });
+    root.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => { dueDraft = toLocalInput(quickDue(b.dataset.q)); $('#td-due').value = dueDraft; $('#td-new').focus(); }));
+    $('#td-qpick').addEventListener('click', () => { const d = $('#td-due'); d.focus(); try { d.showPicker(); } catch {} });
+    $('#td-sortdue').addEventListener('click', () => { st.tsort = st.tsort === 'due' ? 'default' : 'due'; save(); renderTodo(); });
+    root.querySelectorAll('[data-chip]').forEach((b) => {
+      b.addEventListener('click', () => { st.tcat = b.dataset.chip; st.draftCat = null; save(); renderTodo(); });
+      b.addEventListener('contextmenu', (e) => { const c = st.cats.find((x) => x.id === b.dataset.chip); if (c) catMenu(e, c); });
+      b.addEventListener('dragover', (e) => { if (b.dataset.chip !== 'all') { e.preventDefault(); b.classList.add('over'); } });
+      b.addEventListener('dragleave', () => b.classList.remove('over'));
+      b.addEventListener('drop', (e) => { e.preventDefault(); b.classList.remove('over'); if (b.dataset.chip !== 'all') moveTask(drag, b.dataset.chip); });
+    });
+    root.querySelectorAll('[data-cat]').forEach((h) => {
+      const c = st.cats.find((x) => x.id === h.dataset.cat);
+      h.addEventListener('click', () => { st.tcol['c:' + c.id] = !st.tcol['c:' + c.id]; save(); renderTodo(); });
+      h.addEventListener('contextmenu', (e) => catMenu(e, c));
+    });
+    root.querySelectorAll('[data-dfold]').forEach((h) => h.addEventListener('click', () => { const k = 'd:' + h.dataset.dfold; st.tcol[k] = st.tcol[k] === false; save(); renderTodo(); }));
+    root.querySelectorAll('[data-sec]').forEach((s) => {
+      s.addEventListener('dragover', (e) => { e.preventDefault(); s.classList.add('over'); });
+      s.addEventListener('dragleave', (e) => { if (!s.contains(e.relatedTarget)) s.classList.remove('over'); });
+      s.addEventListener('drop', (e) => { e.preventDefault(); s.classList.remove('over'); moveTask(drag, s.dataset.sec); });
+    });
+    root.querySelectorAll('[data-row]').forEach((r) => {
+      r.addEventListener('dragstart', (e) => { drag = r.dataset.row; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', drag); } catch {} r.classList.add('drag'); });
+      r.addEventListener('dragend', () => { r.classList.remove('drag'); drag = null; });
+    });
+    root.querySelectorAll('[data-t]').forEach((cb) => cb.addEventListener('change', () => { const t = st.tasks.find((x) => x.id === cb.dataset.t); t.done = cb.checked; t.doneAt = Date.now(); save(); renderTodo(); }));
+    root.querySelectorAll('[data-star]').forEach((b) => b.addEventListener('click', () => { const t = st.tasks.find((x) => x.id === b.dataset.star); t.star = !t.star; save(); renderTodo(); }));
+    root.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => { st.tasks = st.tasks.filter((x) => x.id !== b.dataset.del); save(); renderTodo(); twr({ do: 'react', name: 'deleted' }); }));
+    root.querySelectorAll('[data-row]').forEach((r) => r.addEventListener('contextmenu', (e) => {
+      const id = r.dataset.row, t = st.tasks.find((x) => x.id === id);
+      if (!t) return;
+      window.hsMenu?.(e, [
+        { label: t.done ? 'Mark as not done' : 'Mark as done', run: () => { t.done = !t.done; t.doneAt = Date.now(); save(); renderTodo(); } },
+        { label: t.star ? 'Remove priority star' : 'Priority star', run: () => { t.star = !t.star; save(); renderTodo(); } },
+        '-',
+        ...st.cats.map((c) => ({ label: `Move to ${c.name}`, off: c.id === tcat(t), run: () => moveTask(id, c.id) })),
+        '-',
+        { label: 'Set due date…', run: () => dueDialog(t) },
+        ...(t.due ? [{ label: 'Clear due date', run: () => setDue(t, null) }] : []),
+        { label: 'Copy text', run: () => navigator.clipboard.writeText(t.text).catch(() => {}) },
+        { label: 'Delete', danger: true, run: () => { st.tasks = st.tasks.filter((x) => x.id !== id); save(); renderTodo(); } },
+      ], t.text.slice(0, 40));
+    }));
     $('#td-clear')?.addEventListener('click', (e) => {
       if (e.target.dataset.armed !== '1') { e.target.dataset.armed = '1'; e.target.textContent = 'SURE? CLEARS ALL DONE'; setTimeout(() => { e.target.dataset.armed = ''; e.target.textContent = 'CLEAR DONE'; }, 3000); return; }
-      st.tasks = st.tasks.filter((t) => !t.done); save(); render();
+      st.tasks = st.tasks.filter((t) => !t.done); save(); renderTodo();
     });
   }
+  let drag = null;
+  // ---------------- due dates + reminders ----------------
+  let dueDraft = '';
+  const dueMs = (t) => { const m = t.due ? Date.parse(t.due) : NaN; return isNaN(m) ? 1e15 : m; };
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const toLocalInput = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+  const dueState = (t) => { const m = dueMs(t); if (m >= 1e15 || t.done) return ''; if (m < Date.now()) return 'over'; return new Date(m).toDateString() === new Date().toDateString() ? 'today' : ''; };
+  const dueLabel = (ms) => { const d = new Date(ms); return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; };
+  function dueChip(t) { const m = dueMs(t); return m >= 1e15 ? '' : `<span class="td-due ${dueState(t)}" title="due ${esc(new Date(m).toLocaleString())}">⏰ ${esc(dueLabel(m))}</span>`; }
+  function quickDue(k) {
+    const d = new Date();
+    if (k === 'today') { d.setHours(18, 0, 0, 0); if (d.getTime() <= Date.now()) d.setHours(23, 59, 0, 0); }
+    else if (k === 'tomorrow') { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
+    else { d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); d.setHours(9, 0, 0, 0); }
+    return d.getTime();
+  }
+  function setDue(t, iso) {
+    delete t.reminded;
+    if (iso) { t.due = iso; if (Date.parse(iso) <= Date.now()) t.reminded = true; } else delete t.due;
+    save(); renderTodo();
+  }
+  function dueDialog(t) {
+    const m = document.createElement('div'); m.className = 'td-duedlg';
+    m.innerHTML = `<div class="panel"><b>DUE DATE · ${esc(t.text.slice(0, 40))}</b><input type="datetime-local" value="${dueMs(t) < 1e15 ? toLocalInput(dueMs(t)) : ''}"><div class="row"><button class="act" data-ok>SET</button><button class="act" data-no>CANCEL</button></div></div>`;
+    document.body.appendChild(m);
+    const inp = m.querySelector('input'); inp.focus();
+    const ok = () => { const ms = Date.parse(inp.value); m.remove(); if (!isNaN(ms)) setDue(t, new Date(ms).toISOString()); };
+    m.querySelector('[data-ok]').addEventListener('click', ok);
+    m.querySelector('[data-no]').addEventListener('click', () => m.remove());
+    m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); if (e.key === 'Escape') m.remove(); });
+  }
+  // fire a twr event (mascot); never throws
+  const twr = (detail) => { try { document.dispatchEvent(new CustomEvent('twr', { detail })); } catch {} };
+  // tow: remember where an element was, re-render, then ask the rabbit to tow the new node from there to its new spot
+  const towFrom = (el) => { try { return el ? el.getBoundingClientRect() : null; } catch { return null; } };
+  const towTo = (from, el) => { try { if (!from || !el) return; const to = el.getBoundingClientRect(); if (Math.hypot(to.left - from.left, to.top - from.top) < 8) return; twr({ do: 'tow', el, from, to }); } catch {} };
+  function moveTask(id, cat) {
+    const t = st.tasks.find((x) => x.id === id);
+    if (!t || !cat || tcat(t) === cat) return;
+    let from = null; try { from = towFrom(root.querySelector(`[data-row="${id}"]`)); } catch {}
+    t.cat = cat; save(); renderTodo();
+    try { towTo(from, root.querySelector(`[data-row="${id}"]`)); } catch {}
+  }
+  // tiny read-only API for other pages
+  // for the rabbit / dock: what is overdue and what is due today (open items only)
+  window.hsTodoDue = () => {
+    const items = st.tasks.filter((t) => !t.done && dueMs(t) < 1e15).sort((a, b) => dueMs(a) - dueMs(b)).map((t) => ({ id: t.id, text: t.text, due: t.due, overdue: dueState(t) === 'over', today: dueState(t) === 'today' }));
+    return { overdue: items.filter((x) => x.overdue).length, today: items.filter((x) => x.today).length, items };
+  };
+  // reminder: when an item's time comes, say so once (the item remembers it was reminded)
+  function checkDue() {
+    const now = Date.now(); let hit = false;
+    for (const t of st.tasks) {
+      if (t.done || !t.due || t.reminded) continue;
+      const m = Date.parse(t.due);
+      if (isNaN(m) || m > now) continue;
+      t.reminded = true; hit = true;
+      try { toast(`DUE NOW · ${String(t.text).slice(0, 60).toUpperCase()}`); } catch {}
+      twr({ say: `${t.text} is due` });
+    }
+    if (hit) { save(); if (!root.contains(document.activeElement) || document.activeElement?.tagName !== 'INPUT') renderTodo(); }
+  }
+  setInterval(checkDue, 30000); setTimeout(checkDue, 5000);
+  window.hsTodoOpen = () => st.tasks.filter((t) => !t.done).map((t) => ({ id: t.id, text: t.text, category: catOf(t.cat).name, star: !!t.star }));
+
 
   function setQuest(id, on) {
     const q = Q.find((x) => x.id === id), before = rankAt(pct());
@@ -257,6 +462,6 @@
     if (s) st = { ...st, ...s };
     // quests HYPERSPACE already knows part of: pre-tick those steps (never the whole quest)
     for (const q of Q) if (q.pre && spotted(q) && !st.quests[q.id]) st.quests[q.id] = { steps: Object.fromEntries(q.pre.map((k) => [k, true])) };
-    render();
+    ensureCats(); render();
   }).catch(render);
 })();

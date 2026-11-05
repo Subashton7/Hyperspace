@@ -1,0 +1,7 @@
+.wn-modal { position: fixed; inset: 0; z-index: 95; background: rgba(0,0,0,.78); display: flex; align-items: center; justify-content: center; }
+.wn-box { width: min(520px, 92vw); max-height: 86vh; overflow-y: auto; padding: 18px 22px; background: rgba(0,12,5,.98); border: 1px solid var(--panel-edge); box-shadow: 0 0 30px rgba(0,255,110,.25); font-family: 'Share Tech Mono', monospace; color: var(--g-hot); }
+.wn-box h2 { margin: 0 0 4px; font-family: Orbitron, sans-serif; letter-spacing: .18em; font-size: 16px; color: var(--g); text-shadow: 0 0 10px var(--g); }
+.wn-box .wn-v { color: var(--g-soft); margin-bottom: 12px; }
+.wn-box ul { margin: 0 0 14px; padding: 0; list-style: none; }
+.wn-box li { padding: 4px 0 4px 18px; position: relative; line-height: 1.4; }
+.wn-box li::before { content: '▸'; position: absolute; left: 0; color: var(--g); }

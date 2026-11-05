@@ -305,6 +305,94 @@
     ctx.fillText(`${label} ${Math.round(frac * 100)}%`, tx, ty);
   }
 
+  // ---------------- reactive backdrop: every metric line drives its own layer ----------------
+  // glow band on its ring (brighter with load, tinted white while rising), pulses that travel outward when the line
+  // climbs and inward when it falls, particle bursts on spikes, and a perimeter arc bar with a rise/fall chevron.
+  const RX = {
+    cpu: { r: 0.52, color: '255,92,168', q: 0, label: 'CPU' },
+    mem: { r: 0.86, color: '0,255,110', q: 1, label: 'MEM' },
+    gpu: { r: 0.93, color: '29,233,182', q: 2, label: 'GPU' },
+    disk: { r: 1.0, color: '198,255,0', q: 3, label: 'DISK' },
+  };
+  for (const k in RX) Object.assign(RX[k], { prev: null, vel: 0, pulses: [], last: 0, parts: [] });
+  let rxT = 0;
+  function rxStep(s, dt) {
+    for (const k in RX) {
+      const m = RX[k], v = state[k + 'S'] || 0;
+      if (m.prev == null) m.prev = v;
+      const raw = (v - m.prev) / Math.max(0.02, dt);
+      m.prev = v;
+      m.vel += (raw - m.vel) * 0.25; // per-second change, smoothed
+      const a = Math.abs(m.vel);
+      if (a > 0.05 && s - m.last > 0.6 && m.pulses.length < 5) { m.pulses.push({ age: 0, dir: m.vel > 0 ? 1 : -1, a: Math.min(1, a * 4) }); m.last = s; }
+      if (a > 0.12 && m.parts.length < 24) {
+        const ang = -Math.PI / 2 + v * TAU + (Math.random() - 0.5) * 0.5;
+        for (let i = 0; i < 2; i++) m.parts.push({ ang, r: 0, dir: m.vel > 0 ? 1 : -1, sp: 25 + Math.random() * 50, life: 1, da: (Math.random() - 0.5) * 0.3 });
+      }
+      for (const p of m.pulses) p.age += dt / 1.3;
+      m.pulses = m.pulses.filter((p) => p.age < 1);
+      for (const p of m.parts) { p.r += p.sp * dt; p.ang += p.da * dt; p.life -= dt / 1.1; }
+      m.parts = m.parts.filter((p) => p.life > 0);
+    }
+  }
+  function drawReactive(ctx, R, s, dpr, front) {
+    const dt = rxT ? Math.min(0.2, s - rxT) : 0.04;
+    if (!front) { rxStep(s, dt); rxT = s; }
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    let act = 0;
+    for (const k in RX) act += state[k + 'S'] || 0;
+    if (!front) {
+      // sacred-geometry grid brightness follows the average load
+      ctx.save(); ctx.rotate(s * 0.02);
+      ctx.strokeStyle = `rgba(0,255,110,${0.025 + (act / 4) * 0.09})`; ctx.lineWidth = dpr;
+      flowerOfLife(ctx, R * 0.34, 3);
+      ctx.restore();
+    }
+    for (const k in RX) {
+      const m = RX[k], v = state[k + 'S'] || 0, r = R * m.r, up = m.vel > 0;
+      const hot = Math.min(1, Math.abs(m.vel) * 3);
+      if (!front) {
+        // glow band hugging the ring; flashes white-ish while the line is moving
+        ctx.lineWidth = (10 + v * 22 + hot * 10) * dpr;
+        ctx.strokeStyle = `rgba(${m.color},${0.04 + v * 0.1 + hot * 0.12})`;
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+        // radial pulses: out = rising, in = falling
+        for (const p of m.pulses) {
+          const rr = r + p.dir * p.age * R * 0.28;
+          ctx.lineWidth = (2 + (1 - p.age) * 4) * dpr;
+          ctx.strokeStyle = p.dir > 0 ? `rgba(${m.color},${(1 - p.age) * 0.5 * p.a})` : `rgba(160,200,255,${(1 - p.age) * 0.4 * p.a})`;
+          ctx.beginPath(); ctx.arc(0, 0, Math.max(2, rr), 0, TAU); ctx.stroke();
+        }
+        // particle bursts
+        ctx.fillStyle = `rgb(${m.color})`;
+        for (const p of m.parts) {
+          const rr = r + p.dir * p.r;
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillRect(Math.cos(p.ang) * rr, Math.sin(p.ang) * rr, 2 * dpr, 2 * dpr);
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        // perimeter bar: one quadrant per line, fill = value, chevron = direction
+        const rb = R * 1.06, a0 = -Math.PI / 2 + m.q * TAU / 4 + 0.08, span = TAU / 4 - 0.16;
+        ctx.lineWidth = 4 * dpr; ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgba(${m.color},0.12)`;
+        ctx.beginPath(); ctx.arc(0, 0, rb, a0, a0 + span); ctx.stroke();
+        ctx.strokeStyle = `rgba(${m.color},${0.5 + hot * 0.5})`;
+        ctx.beginPath(); ctx.arc(0, 0, rb, a0, a0 + span * Math.max(0.01, v)); ctx.stroke();
+        const ha = a0 + span * Math.max(0.01, v), hx = Math.cos(ha) * rb, hy = Math.sin(ha) * rb;
+        if (hot > 0.15) {
+          ctx.save(); ctx.translate(hx, hy); ctx.rotate(ha + Math.PI / 2);
+          ctx.fillStyle = up ? `rgba(${m.color},${hot})` : `rgba(160,200,255,${hot})`;
+          ctx.beginPath(); ctx.moveTo(0, up ? -7 * dpr : 7 * dpr); ctx.lineTo(-4 * dpr, up ? 0 : 0); ctx.lineTo(4 * dpr, 0); ctx.fill();
+          ctx.restore();
+        }
+        ctx.lineCap = 'butt';
+      }
+    }
+    ctx.restore();
+  }
+
   function drawMandala(t) {
     const { w, h, dpr } = fit(mandala, 1); // 1:1 CSS pixels: the mandala is soft glow, extra density only costs GPU
     state.dpr = dpr;
@@ -325,6 +413,8 @@
     ctx.lineWidth = 1 * dpr;
     flowerOfLife(ctx, R * 0.2 * breathe, 2);
     ctx.restore();
+
+    drawReactive(ctx, R, s, dpr, false);
 
     // core petals
     const cores = state.coresS.length ? state.coresS : [0];
@@ -391,6 +481,8 @@
     arcRing(ctx, R * 0.93, state.gpuS, 'GPU', s, '#1de9b6');
     arcRing(ctx, R * 1.0, state.diskS, 'DISK', s, '#c6ff00');
     ctx.restore();
+
+    drawReactive(ctx, R, s, dpr, true);
 
     // orbiting entities: top processes on an elliptical orbit
     const ents = state.entities;

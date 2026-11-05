@@ -17,8 +17,8 @@
     ['Task manager', 'OPERATIONS: what\'s running, end tasks', 'processes task manager kill end close app running entities', view('nexus')],
     ['Privacy: mic & camera', 'SENSES: seal the mic or camera, see which apps used them', 'senses privacy mic microphone camera webcam listened watched', view('senses')],
     ['Accent colour', 'SETTINGS → LOOK: pick purple, cyan, pink, amber… or any colour', 'purple color colour theme accent look style violet cyan pink amber red blue', () => HS.actions.purpleToggle?.()],
-    ['VJ visualizer', 'VJ: visuals that dance to music', 'vj visuals visualizer lights spout resolume obs wallpaper', view('vj')],
-    ['Live wallpaper', 'VJ: visuals behind your desktop', 'wallpaper desktop background', view('vj')],
+    ['VJ visualizer', 'CRATE > VJ: visuals that dance to music', 'vj visuals visualizer lights spout resolume obs wallpaper', view('vj')],
+    ['Live wallpaper', 'CRATE > VJ: visuals behind your desktop', 'wallpaper desktop background', view('vj')],
     ['CRATE: your music', 'rekordbox library, BPM, keys, cues', 'music library rekordbox tracks songs bpm key crate', view('crate')],
     ['DJ decks', 'CRATE: two decks, sync, line up drops', 'dj decks mix crossfader sync drop', view('crate')],
     ['Grab a SoundCloud link', 'CRATE: ⇩ GET', 'soundcloud download grab klickaud link', view('crate')],
@@ -55,7 +55,7 @@
   }
   function draw() {
     const q = box.querySelector('input').value.trim();
-    hits = E.map((e) => [score(e, q), e]).filter(([s]) => s).sort((a, b) => b[0] - a[0]).map(([, e]) => e).slice(0, 7);
+    hits = E.concat(window.FIND_EXTRA || []).map((e) => [score(e, q), e]).filter(([s]) => s).sort((a, b) => b[0] - a[0]).map(([, e]) => e).slice(0, 7);
     // and always: look for the words inside your own stuff
     if (q) {
       const fill = (v, sel) => () => { view(v)(); setTimeout(() => { const i = $(sel); if (i) { i.value = q; i.dispatchEvent(new Event('input', { bubbles: true })); i.focus(); } }, 250); };

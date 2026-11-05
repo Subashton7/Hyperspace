@@ -633,17 +633,65 @@
   }));
   hs.on('config', (c) => { cfg = c; window.applyAccent(c?.look); renderControl(); });
 
-  // ---------------- a little rain (slow, to spare the battery) ----------------
+  // ---------------- matrix rain + faint flower of life (30 fps cap, paused when hidden, off for low power / reduced motion) ----------------
   const cv = $('#rain'), ctx = cv.getContext('2d');
-  let drops = [];
-  function size() { cv.width = innerWidth; cv.height = innerHeight; drops = Array.from({ length: Math.ceil(innerWidth / 16) }, () => Math.random() * innerHeight / 16); }
+  let drops = [], lowBatt = false, lastT = 0, raf = 0, tick7 = 0;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const saver = () => reduce.matches || lowBatt || (navigator.connection && navigator.connection.saveData);
+  const flower = () => { // faint petals, redrawn now and then so the rain's fade doesn't erase them
+    const cx = cv.width / 2, cy = cv.height * 0.45, r = Math.min(cv.width, cv.height) * 0.16;
+    ctx.save(); ctx.strokeStyle = 'rgba(0,255,110,0.10)'; ctx.lineWidth = 1;
+    const c = (x, y) => { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.stroke(); };
+    c(cx, cy); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; c(cx + r * Math.cos(a), cy + r * Math.sin(a)); }
+    ctx.restore();
+  };
+  function size() { cv.width = innerWidth; cv.height = innerHeight; drops = Array.from({ length: Math.ceil(innerWidth / 16) }, () => Math.random() * innerHeight / 16); ctx.fillStyle = '#000400'; ctx.fillRect(0, 0, cv.width, cv.height); flower(); }
   size(); addEventListener('resize', size);
-  setInterval(() => {
-    if (document.hidden || tab === 'vj') return;
-    ctx.fillStyle = 'rgba(0,4,0,0.14)'; ctx.fillRect(0, 0, cv.width, cv.height);
+  function frame(t) {
+    raf = requestAnimationFrame(frame);
+    if (t - lastT < 33) return; lastT = t; // about 30 fps
+    ctx.fillStyle = 'rgba(0,4,0,0.16)'; ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.fillStyle = '#00ff6e'; ctx.font = '14px monospace';
-    drops.forEach((y, i) => { ctx.fillText(String.fromCharCode(0x30a0 + Math.random() * 96), i * 16, y * 16); drops[i] = y * 16 > cv.height && Math.random() > 0.97 ? 0 : y + 1; });
-  }, 80);
+    if (++tick7 % 8 === 0) flower();
+    for (let i = 0; i < drops.length; i++) { const y = drops[i]; ctx.fillText(String.fromCharCode(0x30a0 + Math.random() * 96), i * 16, y * 16); drops[i] = y * 16 > cv.height && Math.random() > 0.97 ? 0 : y + 0.5; }
+  }
+  function rainSync() {
+    const go = !document.hidden && tab !== 'vj' && !saver();
+    if (go && !raf) { lastT = 0; raf = requestAnimationFrame(frame); }
+    if (!go && raf) { cancelAnimationFrame(raf); raf = 0; }
+    cv.style.opacity = saver() ? '0.25' : '';
+  }
+  document.addEventListener('visibilitychange', rainSync);
+  if (reduce.addEventListener) reduce.addEventListener('change', rainSync);
+  if (navigator.getBattery) navigator.getBattery().then((b) => { const f = () => { lowBatt = !b.charging && b.level < 0.2; rainSync(); }; b.addEventListener('levelchange', f); b.addEventListener('chargingchange', f); f(); }).catch(() => {});
+  $('#tabs').addEventListener('click', () => setTimeout(rainSync, 0)); // the rain rests while the VJ owns the screen
+  $('#mode').addEventListener('click', () => setTimeout(rainSync, 0));
+
+  // ---------------- haptics: a tiny tick on button taps, where the phone supports it ----------------
+  document.addEventListener('click', (e) => { if (navigator.vibrate && e.target.closest('button, .row, a.go')) navigator.vibrate(8); }, true);
+
+  // ---------------- twr: a pixel rabbit, hidden until the title is tapped 7 times ----------------
+  (() => {
+    const KEY = 'hs-twr-phone';
+    const SPR = ['..#..#....', '..#..#....', '..#..#....', '..####....', '.######...', '.#.##.#...', '.######...', '.##..##...', '..####....', '.######.#.', '########..', '########..', '.######...', '..#..#....'];
+    const peek = document.createElement('button'); peek.id = 'twr-peek'; peek.setAttribute('aria-label', 'rabbit'); peek.className = 'hidden';
+    const c = document.createElement('canvas'); c.width = 10; c.height = 14; peek.appendChild(c);
+    const g = c.getContext('2d'); g.fillStyle = '#9dffb8'; SPR.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === '#') g.fillRect(x, y, 1, 1); }));
+    g.fillStyle = '#000400'; g.fillRect(3, 5, 1, 1); g.fillRect(6, 5, 1, 1);
+    const say = document.createElement('div'); say.id = 'twr-say';
+    document.body.append(peek, say);
+    const JOKES = ['Why did the rabbit use Wi-Fi? To hop online.', 'There is no spoon. Only carrots.', 'I would tell a UDP joke, but you might not get it.', 'Follow the white rabbit. Mind the cables.', 'A bit and a byte walk into a bar. The bit says: I am parity.'];
+    let ji = Math.floor(Math.random() * JOKES.length), st;
+    const on = () => store.get(KEY, false) === true;
+    const sync = () => { peek.classList.toggle('hidden', !on()); requestAnimationFrame(() => peek.classList.toggle('up', on())); };
+    peek.addEventListener('click', () => { say.textContent = JOKES[ji++ % JOKES.length]; say.classList.add('show'); clearTimeout(st); st = setTimeout(() => say.classList.remove('show'), 4200); });
+    let taps = 0, tt;
+    $('.top b').addEventListener('click', () => {
+      clearTimeout(tt); tt = setTimeout(() => { taps = 0; }, 1500);
+      if (++taps >= 7) { taps = 0; store.set(KEY, !on()); sync(); toast(on() ? 'THE WHITE RABBIT IS HERE' : 'THE RABBIT HOPPED AWAY'); }
+    });
+    sync();
+  })();
 
   // ---------------- start ----------------
   setOut(M.out);

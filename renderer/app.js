@@ -38,6 +38,7 @@ function toast(msg, bad = false) {
 
 // Shared state for the other modules (afterburner.js, vj.js, deck.js).
 const HS = {
+  inVJ: () => HS.view === 'crate' && HS.crateSection === 'vj', // true while CRATE > VJ is showing
   data: {},    // latest perf / telemetry / hw / procs / media / volume / router, read by widgets
   actions: {}, // things widgets and shortcuts can trigger (filled in by each module)
   telemetry: null, core: { state: 'offline' }, config: {}, view: 'nexus', viewListeners: [],
@@ -97,10 +98,11 @@ call('liteGet').then(applyLite).catch(() => {});
 
 // ---------------- navigation ----------------
 function showView(name) {
+  if (name === 'vj') { name = 'crate'; HS.crateSection = 'vj'; } // VJ lives inside CRATE now (CRATE > VJ)
   $$('.nav').forEach((x) => x.classList.toggle('active', x.dataset.view === name));
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
   FX.setSealed($(`#view-${name} .sealed-canvas`) || null);
-  document.body.classList.toggle('vj-mode', name === 'vj'); // the VJ stage covers the background: don't draw it
+  document.body.classList.toggle('vj-mode', name === 'crate' && HS.crateSection === 'vj'); // the VJ stage covers the background: don't draw it
   HS.view = name;
   HS.viewListeners.forEach((fn) => fn(name));
   if (!HS.solo) try { localStorage.setItem('view', name); } catch {}
@@ -470,6 +472,7 @@ function renderCore(s) {
 }
 hs.on('core', renderCore);
 hs.on('toast', (m) => toast(m));
+hs.on('open-view', (v) => { if (!HS.solo && $(`#view-${v}`)) showView(v); });
 // Hardware controls that need Windows' admin permission ask for it right when they're used
 HS.askAdmin = async (what = 'This') => {
   if (HS.core.elevated) return true;

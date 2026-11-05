@@ -21,6 +21,7 @@
       <div class="hw-head">
         <div><div class="kicker">HARDWARE</div><h2 class="glitch" data-text="PORTS & POWER">PORTS &amp; POWER</h2></div>
         <div class="hw-status" id="hw-status"></div>
+        <button class="chip" id="hw-history-btn" title="Every USB device this laptop has ever seen">HISTORY</button>
         <button class="chip" id="hw-refresh" title="Read everything again">⟳ REFRESH</button>
       </div>
       <div class="hw-cards" id="hw-cards"></div>
@@ -35,6 +36,11 @@
       <div class="hw-maprow">
         <div class="hw-map" id="hw-map"><div class="dim">reading the ports… (the first read takes a few seconds)</div></div>
         <aside class="hw-detail hidden" id="hw-detail"></aside>
+      </div>
+      <div class="hw-panel hw-hist hidden" id="hw-hist">
+        <div class="hw-ph">USB HISTORY <span class="dim">· kept only in a file on this laptop</span>
+          <input id="hw-hsearch" class="hw-hsearch" placeholder="search name, maker or socket…" /></div>
+        <div id="hw-hlist"></div>
       </div>
       <details class="hw-builtin"><summary>BUILT INTO THE LAPTOP</summary><div id="hw-builtin"></div></details>
       <p class="hw-note dim">Battery, CPU and graphics numbers are real measurements. Laptops have no sensors on their USB ports, so USB power is what each device
@@ -194,12 +200,31 @@
     detail();
   }
 
+  // ---------------- USB history (src/usb.js keeps the file; this just shows it) ----------------
+  const ago = (t) => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 90 ? 'just now' : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 129600 ? `${Math.round(s / 3600)} h ago` : new Date(t).toLocaleDateString(); };
+  let histRows = [];
+  function histRender() {
+    const q = ($('#hw-hsearch').value || '').toLowerCase().trim();
+    const rows = histRows.filter((r) => !q || [r.name, r.maker, r.sockLabel, names[r.sockId], r.trail, r.vid, r.pid].join(' ').toLowerCase().includes(q));
+    $('#hw-hlist').innerHTML = rows.length ? `<table class="hw-htab"><tr><th></th><th>DEVICE</th><th>LAST IN</th><th>FIRST SEEN</th><th>LAST SEEN</th><th>TIMES</th></tr>${rows.map((r) => `
+      <tr class="${r.on ? 'now' : ''}"><td>${r.on ? '<i class="hw-dot" title="connected right now"></i>' : ''}</td><td><b>${esc(r.name)}</b>${r.maker ? `<span class="hw-mk">${esc(r.maker)}</span>` : ''}</td>
+      <td>last in ${esc(names[r.sockId] || r.sockLabel || '?')}${r.trail ? ` → ${esc(r.trail)}` : ''}</td><td>${new Date(r.first).toLocaleString()}</td><td>${r.on ? 'connected now' : ago(r.last)}</td><td>${r.count}</td></tr>`).join('')}</table>` : '<div class="dim" style="padding:10px">nothing here yet</div>';
+  }
+  async function histLoad() { try { histRows = await hs.call('usbHistory'); } catch { histRows = []; } histRender(); }
+  $('#hw-history-btn').addEventListener('click', () => { const h = $('#hw-hist'); h.classList.toggle('hidden'); if (!h.classList.contains('hidden')) histLoad(); });
+  $('#hw-hsearch').addEventListener('input', histRender);
+
   async function load() {
     if (busy) return;
     busy = true;
     try {
       const [t, n] = await Promise.all([hs.call('usbTree'), hs.call('portNames')]);
       data = t; names = n || {};
+      for (const d of t.newDevices || []) {
+        toast(`NEW DEVICE · ${d.name.toUpperCase()}`);
+        try { document.dispatchEvent(new CustomEvent('twr', { detail: { say: `New USB device: ${d.name}. Never seen that one before.` } })); } catch {}
+      }
+      if (!$('#hw-hist').classList.contains('hidden')) histLoad();
       const p = t.power || {};
       hist.push({ bat: p.battery ? (p.charging ? p.chargeW : -(p.dischargeW || 0)) : null, cpu: tele?.cpu?.power ?? null, gpu: tele?.gpu?.power ?? null });
       if (hist.length > HIST) hist.shift();
@@ -208,7 +233,7 @@
     busy = false;
   }
 
-  hs.on('telemetry', (t) => { tele = t; if (HS.view === 'hardware' && data) where(); });
+  hs.on('telemetry', (t) => { tele = t; if (window.hsSecOpen?.('hardware') && data) where(); });
 
   root.addEventListener('click', async (e) => {
     if (e.target.id === 'hw-refresh') return load();
@@ -232,13 +257,15 @@
     const dv = e.target.closest('.hw-dev');
     if (dv) { pick = pick === dv.dataset.dev ? null : dv.dataset.dev; render(); }
   });
-  window.addEventListener('resize', () => { if (HS.view === 'hardware') graph(); });
+  window.addEventListener('resize', () => { if (window.hsSecOpen?.('hardware')) graph(); });
 
   // live while the page is open: plugging something in shows up within a few seconds
-  HS.viewListeners.push((v) => {
+  const sync = () => {
     clearInterval(timer);
-    if (v !== 'hardware') return;
+    if (!window.hsSecOpen?.('hardware')) return;
     load();
     timer = setInterval(load, 4000);
-  });
+  };
+  HS.viewListeners.push(sync);
+  document.addEventListener('hs-sec', (e) => { if (e.detail.name === 'hardware') sync(); });
 })();
